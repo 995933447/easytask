@@ -10,6 +10,7 @@ type TaskRepo interface {
 	TimeoutTasks(ctx context.Context, size int) ([]*task.Task, error)
 	LockTask(context.Context, *task.Task) (bool, error)
 	ConfirmTasks(context.Context, []*task.TaskResp) error
+	ConfirmTask(context.Context, *task.TaskResp) error
 }
 
 type TaskCallbackSrvRepo interface {

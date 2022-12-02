@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/995933447/easytask/internal/callbacksrvexec"
 	"github.com/995933447/easytask/internal/sched"
+	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/easytask/pkg/cntx"
 	"time"
 )
 
@@ -38,16 +40,18 @@ func (e *workerEngine) createWorkerPool(ctx context.Context) {
 	var i uint
 	for ; i < e.workerPoolSize; i++ {
 		taskIn := make(chan *Task)
-		go e.runWorker(ctx, taskIn)
+		go e.runWorker(taskIn)
 	}
 }
 
-func (e *workerEngine) runWorker(ctx context.Context, taskIn chan *Task) {
+func (e *workerEngine) runWorker(taskIn chan *Task) {
 	for {
 		e.sched.TaskWorkerReady(taskIn)
 		task := <-taskIn
+		ctx := cntx.New("task")
 		locked, err := e.sched.LockTaskForRun(ctx, task)
 		if err != nil {
+			logger.MustGetTaskProcLogger().Error(ctx, err)
 			return
 		}
 		if !locked {
@@ -55,6 +59,7 @@ func (e *workerEngine) runWorker(ctx context.Context, taskIn chan *Task) {
 		}
 		taskResp, err := task.run(ctx, e.callbackTaskSrvExec)
 		if err != nil {
+			logger.MustGetTaskProcLogger().Error(ctx, err)
 			taskResp = newInternalErrTaskResp(task.id, err, time.Now().Unix())
 		}
 		e.sched.SubmitTaskResp(taskResp)

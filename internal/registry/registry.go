@@ -7,6 +7,7 @@ import (
 	"github.com/995933447/easytask/internal/repo"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/errs"
+	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/optionstream"
 	"time"
 )
@@ -22,9 +23,11 @@ type Registry struct {
 	callbackSrvExec callbacksrvexec.TaskCallbackSrvExec
 	readyCheckSrvChan chan *task.TaskCallbackSrv
 	elect autoelect.AutoElection
+	isClusterMode bool
 }
 
 func NewRegistry(
+	isClusterMode bool,
 	checkHealthWorkerPoolSize uint,
 	srvRepo repo.TaskCallbackSrvRepo,
 	callbackSrvExec callbacksrvexec.TaskCallbackSrvExec,
@@ -39,6 +42,7 @@ func NewRegistry(
 		callbackSrvExec: callbackSrvExec,
 		readyCheckSrvChan: make(chan *task.TaskCallbackSrv),
 		elect: elect,
+		isClusterMode: isClusterMode,
 	}
 }
 
@@ -53,8 +57,10 @@ func (r *Registry) Unregister(ctx context.Context, srv *task.TaskCallbackSrv) er
 }
 
 func (r *Registry) HeathCheck(ctx context.Context) error {
-	if !r.elect.IsMaster() {
-		return errs.ErrCurrentNodeNoMaster
+	if r.isClusterMode && !r.elect.IsMaster() {
+		err := errs.ErrCurrentNodeNoMaster
+		logger.MustGetMainProcLogger().Error(ctx, err)
+		return err
 	}
 
 	queryStream := optionstream.NewQueryStream(nil, 1000, 0).
@@ -63,6 +69,7 @@ func (r *Registry) HeathCheck(ctx context.Context) error {
 	for {
 		srvs, err := r.srvRepo.GetSrvs(ctx, queryStream)
 		if err != nil {
+			logger.MustGetMainProcLogger().Error(ctx, err)
 			return err
 		}
 
@@ -86,7 +93,7 @@ func (r *Registry) Run(ctx context.Context) {
 func (r *Registry) sched(ctx context.Context) {
 	for {
 		if err := r.HeathCheck(ctx); err != nil {
-
+			logger.MustGetMainProcLogger().Error(ctx, err)
 		}
 		time.Sleep(time.Duration(r.checkHealthIntervalSec) * time.Second)
 	}
@@ -124,7 +131,7 @@ func (r *Registry) createHealthCheckWorkerPool(ctx context.Context) {
 			}
 			for _, srv := range withNoReplyRouteSrvs {
 				if err := r.srvRepo.DelSrvRoutes(ctx, srv); err != nil {
-
+					logger.MustGetMainProcLogger().Error(ctx, err)
 				}
 			}
 		case withReplyRouteSrv := <- withReplyRouteSrvCh:
@@ -144,7 +151,7 @@ func (r *Registry) createHealthCheckWorkerPool(ctx context.Context) {
 
 			for _, srv := range withReplyRouteSrvs {
 				if err := r.srvRepo.SetSrvRoutesPassHealthCheck(ctx, srv); err != nil {
-
+					logger.MustGetMainProcLogger().Error(ctx, err)
 				}
 			}
 		}
@@ -155,6 +162,7 @@ func (r *Registry) runWorker(ctx context.Context, withNoReplyRouteSrvCh, withRep
 	srv := <- r.readyCheckSrvChan
 	heatBeatResp, err := r.callbackSrvExec.HeartBeat(ctx, srv)
 	if err != nil {
+		logger.MustGetMainProcLogger().Error(ctx, err)
 		return
 	}
 	withNoReplyRouteSrvCh <- task.NewTaskCallbackSrv(srv.GetName(), heatBeatResp.GetNoReplyRoutes(), true)

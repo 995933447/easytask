@@ -6,25 +6,25 @@ import (
 	"github.com/995933447/autoelect"
 	electfactory "github.com/995933447/autoelect/factory"
 	"github.com/995933447/confloader"
-	"github.com/995933447/distribmu"
 	distribmufactory "github.com/995933447/distribmu/factory"
 	callbacksrvexecimpl "github.com/995933447/easytask/internal/callbacksrvexec/impl"
 	"github.com/995933447/easytask/internal/registry"
 	"github.com/995933447/easytask/internal/repo"
+	mysqlrepo "github.com/995933447/easytask/internal/repo/impl/mysql"
 	"github.com/995933447/easytask/internal/sched"
 	"github.com/995933447/easytask/internal/task"
-	mysqlrepo "github.com/995933447/easytask/internal/repo/impl/mysql"
-	"github.com/995933447/std-go/print"
+	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/easytask/pkg/cntx"
 	"github.com/995933447/log-go"
 	"github.com/995933447/log-go/impls/loggerwriters"
 	"github.com/995933447/redisgroup"
+	"github.com/995933447/std-go/print"
 	"github.com/995933447/std-go/scan"
-	"errors"
 	"github.com/etcd-io/etcd/client"
-	"github.com/fengleng/mars/config"
-	p "golang.org/x/tools/go/analysis/passes/sigchanyzer/testdata/src/a"
 	"os"
 	"os/signal"
+	"runtime/debug"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -48,19 +48,28 @@ type RedisConf struct {
 }
 
 type Conf struct {
+	IsClusterMode bool 	`json:"is_cluster_mode"`
 	ClusterName string `json:"cluster_name"`
 	TaskWorkerPoolSize uint `json:"task_worker_pool_size"`
 	ElectDriver string `json:"elect_driver"`
-	*MysqlConf `json:"mysql_conf"`
-	*EtcdConf `json:"etcd_conf"`
-	*RedisConf `json:"redis_conf"`
+	*MysqlConf `json:"mysql"`
+	*EtcdConf `json:"etcd"`
+	*RedisConf `json:"redis"`
 	HealthCheckWorkerPoolSize uint `json:"health_check_worker_pool_size"`
+	LoggerConf *logger.Conf `json:"log"`
 }
 
 func main() {
-	conf, _ := loadConf()
+	conf, err := loadConf()
+	if err != nil {
+		panic(any(err))
+	}
 
-	ctx := context.TODO()
+	ctx := cntx.New("main")
+
+	defer RecoverPanic(ctx)
+
+	logger.Init(conf.LoggerConf)
 
 	taskRepo, taskCallbackSrvRepo, err := NewRepos(conf)
 	if err != nil {
@@ -76,21 +85,38 @@ func main() {
 
 	runTaskWorker(ctx, conf, taskRepo, elect)
 
-	sysSignCh := make(chan os.Signal)
+	signCh := make(chan os.Signal)
 	go func() {
 		for {
-			_ = <-sysSignCh
+			_ = <-signCh
 			elect.StopElect()
 			os.Exit(0)
 		}
 	}()
-	signal.Notify(sysSignCh, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(signCh, syscall.SIGINT, syscall.SIGTERM)
 }
 
-func loadConf() (*Conf, *confloader.Loader) {
+func RecoverPanic(ctx context.Context) {
+	if err := recover(); err != nil {
+		logger.MustGetMainProcLogger().Errorf(ctx, "PROCESS PANIC: err %s", err)
+		stack := debug.Stack()
+		if len(stack) > 0 {
+			lines := strings.Split(string(stack), "\n")
+			for _, line := range lines {
+				logger.MustGetMainProcLogger().Error(ctx, line)
+			}
+		}
+		logger.MustGetMainProcLogger().Errorf(ctx, "stack is empty (%s)", err)
+	}
+}
+
+func loadConf() (*Conf, error) {
 	confFile := scan.OptStr("c")
 	var conf Conf
 	confLoader := confloader.NewLoader(confFile, 3, &conf)
+	if err := confLoader.Load(); err != nil {
+		return nil, err
+	}
 	errCh := make(chan error)
 	go func() {
 		for {
@@ -98,7 +124,7 @@ func loadConf() (*Conf, *confloader.Loader) {
 		}
 	}()
 	go confLoader.WatchToLoad(errCh)
-	return &conf, confLoader
+	return &conf, nil
 }
 
 func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error) {
@@ -170,6 +196,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 
 func runRegistry(ctx context.Context, conf *Conf, taskCallbackSrvRepo repo.TaskCallbackSrvRepo, elect autoelect.AutoElection) {
 	reg := registry.NewRegistry(
+		conf.IsClusterMode,
 		conf.HealthCheckWorkerPoolSize,
 		taskCallbackSrvRepo,
 		callbacksrvexecimpl.NewHttpExec(),
@@ -196,7 +223,7 @@ func NewRepos(conf *Conf) (repo.TaskRepo, repo.TaskCallbackSrvRepo, error) {
 func runTaskWorker(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, elect autoelect.AutoElection) {
 	engine :=  task.NewWorkerEngine(
 		conf.TaskWorkerPoolSize,
-		sched.NewSched(taskRepo, elect),
+		sched.NewSched(conf.IsClusterMode, taskRepo, elect),
 		callbacksrvexecimpl.NewHttpExec(),
 		)
 	go engine.Run(ctx)

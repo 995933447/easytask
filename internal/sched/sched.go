@@ -13,6 +13,7 @@ type Sched struct {
 	taskRepo repo.TaskRepo
 	taskRespCh chan *task.TaskResp
 	elect autoelect.AutoElection
+	isClusterMode 		bool
 }
 
 func (s *Sched) LockTaskForRun(ctx context.Context, task *task.Task) (bool, error) {
@@ -30,7 +31,7 @@ func (s *Sched) Run(ctx context.Context) {
 
 func (s *Sched) schedule(ctx context.Context) {
 	for {
-		if !s.elect.IsMaster() {
+		if s.isClusterMode && !s.elect.IsMaster() {
 			time.Sleep(time.Second)
 			continue
 		}
@@ -82,11 +83,12 @@ func (s *Sched) SubmitTaskResp(resp *task.TaskResp) {
 	s.taskRespCh <- resp
 }
 
-func NewSched(taskRepo repo.TaskRepo, elect autoelect.AutoElection) *Sched {
+func NewSched(isClusterMode bool, taskRepo repo.TaskRepo, elect autoelect.AutoElection) *Sched {
 	return &Sched{
 		taskWorkerCh: make(chan chan *task.Task),
 		taskRepo: taskRepo,
 		taskRespCh: make(chan *task.TaskResp),
 		elect: elect,
+		isClusterMode: isClusterMode,
 	}
 }

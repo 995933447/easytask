@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"github.com/995933447/easytask/internal/callbacksrvexec"
+	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/go-playground/validator"
 	"math/rand"
 	"time"
@@ -11,10 +12,20 @@ import (
 type Status int
 
 const (
-	StatusReady Status = iota
+	StatusNil = iota
+	StatusReady
 	StatusRunning
 	StatusSuccess
 	StatusFailed
+)
+
+type SchedMode int
+
+const (
+	SchedModeNil SchedMode = iota
+	SchedModeTimeCron
+	SchedModeTimeSpec
+	SchedModeTimeInterval
 )
 
 type (
@@ -22,6 +33,7 @@ type (
 		taskId string
 		isRunInAsync bool
 		taskStatus Status
+		taskRunTimes int
 		extra any
 	}
 
@@ -47,12 +59,17 @@ func (r *TaskResp) GetTaskStatus() Status {
 	return r.taskStatus
 }
 
-func newTaskResp(taskId string, isRunInAsync bool, taskStatus Status, extra any) *TaskResp {
+func (r *TaskResp) GetTaskRunTimes() int {
+	return r.taskRunTimes
+}
+
+func newTaskResp(taskId string, isRunInAsync bool, taskStatus Status, taskRunTimes int, extra any) *TaskResp {
 	return &TaskResp{
 		taskId: taskId,
 		isRunInAsync: isRunInAsync,
 		taskStatus: taskStatus,
 		extra: extra,
+		taskRunTimes: taskRunTimes,
 	}
 }
 
@@ -155,25 +172,33 @@ type Task struct {
 	callbackSrv *TaskCallbackSrv
 	name string
 	arg []byte
-	isRunInAsync bool
-	status Status
-	triedCnt int
+	runTimes int
 	lastRunAt int64
-	maxTryCnt int
-	skippedTryCnt int
+	allowMaxRunTimes int
 	maxRunTimeSec int
+	schedMode SchedMode
+	timeCronExpr string
+	timeIntervalSec int
 }
 
-func (t *Task) GetMaxRuntimeSec() int {
+func (t *Task) GetTimeIntervalSec() int {
+	return t.timeIntervalSec
+}
+
+func (t *Task) GetSchedMode() SchedMode {
+	return t.schedMode
+}
+
+func (t *Task) GetTimeCronExpr() string {
+	return t.timeCronExpr
+}
+
+func (t *Task) GetMaxRunTimeSec() int {
 	return t.maxRunTimeSec
 }
 
-func (t *Task) GetSkippedTryCnt() int {
-	return t.skippedTryCnt
-}
-
-func (t *Task) GetMaxTryCnt() int {
-	return t.maxTryCnt
+func (t *Task) GetAllowMaxRunTimes() int {
+	return t.allowMaxRunTimes
 }
 
 func (t *Task) GetLastRunAt() int64 {
@@ -196,37 +221,18 @@ func (t *Task) GetArg() []byte {
 	return t.arg
 }
 
-func (t *Task) IsRunInAsync() bool {
-	return t.isRunInAsync
+func (t *Task) GetRunTimes() int {
+	return t.runTimes
 }
 
-func (t *Task) GetStatus() Status {
-	return t.status
-}
-
-func (t *Task) GetTriedCnt() int {
-	return t.triedCnt
-}
-
-func (t *Task) IsReady() bool {
-	return IsTaskReady(t.status)
-}
-
-func (t *Task) IsRunning() bool {
-	return IsTaskRunning(t.status)
-}
-
-func (t *Task) IsSuccess() bool {
-	return IsTaskSuccess(t.status)
-}
-
-func (t *Task) IsFailed() bool {
-	return IsTaskFailed(t.status)
+func (t *Task) IncrRunTimes() {
+	t.runTimes++
 }
 
 func (t *Task) run(ctx context.Context, callbackExec callbacksrvexec.TaskCallbackSrvExec) (*TaskResp, error) {
 	callbackResp, err := callbackExec.CallbackSrv(ctx, t, nil)
 	if err != nil {
+		logger.MustGetTaskProcLogger().Error(ctx, err)
 		return nil, err
 	}
 
@@ -239,7 +245,7 @@ func (t *Task) run(ctx context.Context, callbackExec callbacksrvexec.TaskCallbac
 		status = StatusSuccess
 	}
 
-	return newTaskResp(t.id, callbackResp.IsRunInAsync(), status, callbackResp.GetExtra()), nil
+	return newTaskResp(t.id, callbackResp.IsRunInAsync(), status, t.runTimes, callbackResp.GetExtra()), nil
 }
 
 type NewTaskInput struct {
@@ -247,13 +253,13 @@ type NewTaskInput struct {
 	CallbackSrv *TaskCallbackSrv `validate:"required"`
 	Name string `validate:"required"`
 	Arg []byte `validate:"required"`
-	IsRunInAsync bool
-	Status Status
-	TriedCnt int
+	RunTimes int
 	LastRunAt int64
-	MaxTryCnt int
-	SkippedTryCnt int
+	AllowMaxRunTimes int
 	MaxRunTimeSec int
+	SchedMode SchedMode `validate:"required"`
+	TimeCronExpr string
+	TimeIntervalSec int
 }
 
 func (input *NewTaskInput) Check() error {
@@ -269,10 +275,14 @@ func NewTask(input *NewTaskInput) (*Task, error) {
 		id: input.Id,
 		name: input.Name,
 		arg: input.Arg,
-		status: input.Status,
-		triedCnt: input.TriedCnt,
+		runTimes: input.RunTimes,
 		callbackSrv: input.CallbackSrv,
-		isRunInAsync: input.IsRunInAsync,
+		allowMaxRunTimes: input.AllowMaxRunTimes,
+		lastRunAt: input.LastRunAt,
+		maxRunTimeSec: input.MaxRunTimeSec,
+		schedMode: input.SchedMode,
+		timeCronExpr: input.TimeCronExpr,
+		timeIntervalSec: input.TimeIntervalSec,
 	}, nil
 }
 

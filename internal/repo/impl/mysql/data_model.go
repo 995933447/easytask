@@ -4,18 +4,21 @@ import (
 	"fmt"
 	"github.com/995933447/dbdriverutil/field"
 	"github.com/995933447/easytask/internal/task"
+	"errors"
 	"gorm.io/plugin/soft_delete"
 	"strconv"
 )
 
 const (
-	execModeNil = iota
-	execModeTimeSpec
-	execModeCron
+	schedModeNil = iota
+	schedModeTimeSpec
+	schedModeTimeCron
+	schedModeTimeInterval
 )
 
 const (
 	statusNil = iota
+	statusReady
 	statusRunning
 	statusSuccess
 	statusFailed
@@ -36,20 +39,21 @@ type TaskModel struct {
 	Arg field.Json
 	Status int
 	LastRunAt int64
-	NextRunAt int64
-	TimeCron string
-	ExecMode int
+	PlanSchedNextAt int64
+	TimeCronExpr string
+	TimeIntervalSec int
+	SchedMode int
 	CallbackSrvId uint64
-	TriedCnt int
+	RunTimes int
 	IsRunInAsync bool
 	LastFailedAt int64
-	MaxTryCnt int
-	SkippedTryCnt int
+	LastSuccessAt int64
+	AllowMaxRunTimes int
 	MaxRunTimeSec int
 }
 
 func (t *TaskModel) toEntity(callbackSrv *task.TaskCallbackSrv) (*task.Task, error) {
-	taskEntityStatus, err := t.toEntityStatus()
+	entitySchedMode, err := t.toSchedMode()
 	if err != nil {
 		return nil, err
 	}
@@ -57,29 +61,27 @@ func (t *TaskModel) toEntity(callbackSrv *task.TaskCallbackSrv) (*task.Task, err
 		Id: t.toEntityId(),
 		Name: t.Name,
 		Arg: t.Arg,
-		IsRunInAsync: t.IsRunInAsync,
-		Status: taskEntityStatus,
-		TriedCnt: t.TriedCnt,
+		RunTimes: t.RunTimes,
 		LastRunAt: t.LastRunAt,
-		MaxTryCnt: t.MaxTryCnt,
-		SkippedTryCnt: t.SkippedTryCnt,
+		AllowMaxRunTimes: t.AllowMaxRunTimes,
 		MaxRunTimeSec: t.MaxRunTimeSec,
 		CallbackSrv: callbackSrv,
+		TimeIntervalSec: t.TimeIntervalSec,
+		TimeCronExpr: t.TimeCronExpr,
+		SchedMode: entitySchedMode,
 	})
 }
 
-func (t *TaskModel) toEntityStatus() (task.Status, error) {
-	switch t.Status {
-	case statusNil:
-		return task.StatusReady, nil
-	case statusRunning:
-		return task.StatusRunning, nil
-	case statusSuccess:
-		return task.StatusSuccess, nil
-	case statusFailed:
-		return task.StatusFailed, nil
+func (t *TaskModel) toSchedMode() (task.SchedMode, error) {
+	switch t.SchedMode {
+	case schedModeTimeCron:
+		return task.SchedModeTimeCron, nil
+	case schedModeTimeSpec:
+		return task.SchedModeTimeSpec, nil
+	case schedModeTimeInterval:
+		return task.SchedModeTimeInterval, nil
 	}
-	return 0, fmt.Errorf("invalid status:%d", t.Status)
+	return schedModeNil, errors.New("invalid schedule mode")
 }
 
 func (t *TaskModel) toEntityId() string {
@@ -137,4 +139,15 @@ func (m *TaskCallbackSrvRouteModel) toEntity() *task.TaskCallbackSrvRoute {
 		m.CallbackTimeoutSec,
 		m.EnableHealthCheck,
 		)
+}
+
+type TaskLogModel struct {
+	BaseModel
+	TaskId uint64 `json:"task_id"`
+	StartedAt int64 `json:"started_at"`
+	EndedAt int64 `json:"ended_at"`
+	TaskStatus int `json:"task_status"`
+	IsRunInAsync bool `json:"is_run_in_async"`
+	RespExtra field.Json `json:"resp_extra"`
+	TryTimes int `json:"try_times"`
 }
