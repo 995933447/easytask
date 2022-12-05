@@ -28,7 +28,7 @@ import (
 )
 
 type MysqlConf struct {
-	ConnDsn string `json:"conn_dsn"`
+	ConnDsn string `json:"dsn"`
 }
 
 type EtcdConf struct {
