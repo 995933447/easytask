@@ -62,7 +62,7 @@ func (r *Router) Register(ctx context.Context, route *Route) error {
 	}
 
 	handlerType := reflect.TypeOf(route.Handler)
-	errInvalidHandler := errors.New("handler must be implements func(api.*Context, req)) (resp, error)")
+	errInvalidHandler := errors.New("handler must be implements func(api.*Context, *req)) (*resp, error)")
 
 	if handlerType.NumIn() != 2 || handlerType.NumOut() != 2 {
 		log.Error(ctx, errInvalidHandler)
