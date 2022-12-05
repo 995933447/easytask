@@ -81,7 +81,7 @@ func (r *TaskSrvRepo) AddSrvRoutes(ctx context.Context, srv *task.TaskCallbackSr
 		}
 	}
 
-	if hasEnableHealthCheck {
+	if hasEnableHealthCheck && !srvModel.HasEnableHealthCheck {
 		err := conn.Model(&TaskCallbackSrvModel{}).
 			Where(DbFieldId, srvModel.Id).
 			Update(DbFieldHasEnableHealthCheck, true).

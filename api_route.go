@@ -2,9 +2,14 @@ package easytask
 
 import (
 	"github.com/995933447/easytask/internal/apihandler"
+	"github.com/995933447/easytask/internal/repo"
 	"net/http"
 )
 
-var apiRoutes = []*apihandler.Route{
-	{Path: "/task", Method: http.MethodPost, Handler: apihandler.AddTask},
+func getApiRoutes(taskRepo repo.TaskRepo, taskCallbackSrvRepo repo.TaskCallbackSrvRepo) []*apihandler.Route {
+	return []*apihandler.Route{
+		{Path: "/task", Method: http.MethodPost, Handler: apihandler.AddTaskHandler(taskRepo)},
+		{Path: "/task/server", Method: http.MethodPost, Handler: apihandler.AddTaskCallbackSrvHandler(taskCallbackSrvRepo)},
+	}
 }
+
