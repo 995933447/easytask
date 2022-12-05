@@ -27,7 +27,7 @@ var _ callbacksrvexec.TaskCallbackSrvExec = (*HttpExec)(nil)
 
 func (e *HttpExec) CallbackSrv(ctx context.Context, task *task.Task, _ any) (*callbacksrvexec.TaskCallbackSrvResp, error) {
 	var (
-		log = logger.MustGetSysProcLogger()
+		log = logger.MustGetSysLogger()
 		httpReq = &httpproto.TaskCallbackReq{
 			Cmd: httpproto.HttpCallbackCmdTaskCallback,
 			Arg:      task.GetArg(),
@@ -70,7 +70,7 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, task *task.Task, _ any) (*ca
 
 func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*callbacksrvexec.HeartBeatResp, error) {
 	var (
-		log = logger.MustGetSysProcLogger()
+		log = logger.MustGetSysLogger()
 		httpReq = &httpproto.HeartBeatReq{
 			Cmd: httpproto.HttpCallbackCmdTaskHeartBeat,
 		}

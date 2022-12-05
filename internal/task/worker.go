@@ -49,7 +49,7 @@ func (e *workerEngine) runWorker(taskIn chan *Task) {
 		e.sched.TaskWorkerReady(taskIn)
 		task := <-taskIn
 		ctx := contx.New("task", context.TODO())
-		log := logger.MustGetSysProcLogger()
+		log := logger.MustGetSysLogger()
 		locked, err := e.sched.LockTaskForRun(ctx, task)
 		if err != nil {
 			log.Error(ctx, err)

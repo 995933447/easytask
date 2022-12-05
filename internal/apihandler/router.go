@@ -24,7 +24,8 @@ type handlerReflect struct {
 }
 
 type Route struct {
-	Path, Method string `validate:"required"`
+	Path string `validate:"required"`
+	Method string `validate:"required"`
 	Handler any `validate:"required"`
 }
 
@@ -43,7 +44,7 @@ type Router struct {
 func (r *Router) RegisterBatch(ctx context.Context, routes []*Route) error {
 	for _, route := range routes {
 		if err := r.Register(ctx, route); err != nil {
-			logger.MustGetSysProcLogger().Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 		}
 	}
 	return nil
@@ -54,7 +55,7 @@ func (r *Router) Register(ctx context.Context, route *Route) error {
 		return internalerr.ErrServerStarted
 	}
 
-	log := logger.MustGetSysProcLogger()
+	log := logger.MustGetSysLogger()
 
 	if err := route.Check(); err != nil {
 		log.Error(ctx, err)
@@ -125,7 +126,7 @@ func (r *Router) Boot(ctx context.Context) error {
 
 	respErr := func(ctx context.Context, writer http.ResponseWriter, errCode errs.ErrCode) {
 		if err := r.writeResp(ctx, writer, int(errCode), []byte(errs.GetErrMsg(errCode)), nil); err != nil {
-			logger.MustGetSessProcLogger().Error(ctx, err)
+			logger.MustGetSessLogger().Error(ctx, err)
 		}
 	}
 
@@ -153,7 +154,7 @@ func (r *Router) Boot(ctx context.Context) error {
 			replies := handlerReflec.handler.Call([]reflect.Value{reflect.ValueOf(ctx), handleReq})
 			err := replies[1].Interface().(error)
 			if err != nil {
-				logger.MustGetSessProcLogger().Error(ctx, err)
+				logger.MustGetSessLogger().Error(ctx, err)
 				respErr(ctx, writer, errs.ErrCodeInternal)
 				return
 			}
@@ -161,14 +162,14 @@ func (r *Router) Boot(ctx context.Context) error {
 			resp := replies[0].Interface()
 			respJson, err := json.Marshal(resp)
 			if err != nil {
-				logger.MustGetSessProcLogger().Error(ctx, err)
+				logger.MustGetSessLogger().Error(ctx, err)
 				respErr(ctx, writer, errs.ErrCodeInternal)
 				return
 			}
 
 			err = r.writeResp(ctx, writer, 200, respJson, map[string]string{"Content-Type": "application/json"})
 			if err != nil {
-				logger.MustGetSessProcLogger().Error(ctx, err)
+				logger.MustGetSessLogger().Error(ctx, err)
 				return
 			}
 		})
@@ -179,7 +180,7 @@ func (r *Router) Boot(ctx context.Context) error {
 		Handler:      srvMux,
 	}
 	if err := srv.ListenAndServe(); err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}
 
@@ -200,7 +201,7 @@ func (r *Router) writeResp(ctx context.Context, writer http.ResponseWriter, code
 	for {
 		n, err := writer.Write(content)
 		if err != nil {
-			logger.MustGetSessProcLogger().Error(ctx, err)
+			logger.MustGetSessLogger().Error(ctx, err)
 			return err
 		}
 		written += n

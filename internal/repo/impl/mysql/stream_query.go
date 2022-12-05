@@ -47,7 +47,7 @@ func (q *OptStreamQuery) Query(ctx context.Context, limit, offset int64, list in
 		db.Limit(int(offset))
 	}
 	if err := db.Scan(list).Error; err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}
 	return nil
