@@ -152,7 +152,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 			return nil, err
 		}
 
-		elect, err = electfactory.NewAuthElection(
+		elect, err = electfactory.NewAutoElection(
 			electfactory.ElectDriverGitDistribMu,
 			electfactory.NewDistribMuElectDriverConf(
 				conf.ClusterName,
@@ -172,7 +172,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 		}
 		redisGroup := redisgroup.NewGroup(nodes, logger.MustGetSysLogger().(*log.Logger))
 
-		elect, err = electfactory.NewAuthElection(
+		elect, err = electfactory.NewAutoElection(
 			electfactory.ElectDriverGitDistribMu,
 			electfactory.NewDistribMuElectDriverConf(
 				conf.ClusterName,

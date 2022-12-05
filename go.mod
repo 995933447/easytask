@@ -3,7 +3,7 @@ module github.com/995933447/easytask
 go 1.19
 
 require (
-	github.com/995933447/autoelect v0.0.0-20221130095631-86020496f0bd
+	github.com/995933447/autoelect v0.0.0-20221205105211-eff1e99f1cfb
 	github.com/995933447/confloader v0.0.0-20221201090521-fc5ce6a68064
 	github.com/995933447/dbdriverutil v0.0.0-20220815160147-6e3336599c28
 	github.com/995933447/distribmu v0.0.0-20221129161736-69f07b237cf4

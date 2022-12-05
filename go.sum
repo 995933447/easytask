@@ -1,5 +1,7 @@
 github.com/995933447/autoelect v0.0.0-20221130095631-86020496f0bd h1:ppNiX5+eSZ17vcRwDs0/PRa+JeN1SRdmHrx+/JfRshE=
 github.com/995933447/autoelect v0.0.0-20221130095631-86020496f0bd/go.mod h1:Df++6C9g90CigOVZYxVUa+sS50Sb36M08nAgIN/bLZA=
+github.com/995933447/autoelect v0.0.0-20221205105211-eff1e99f1cfb h1:Qrxzy3kCZgKrfw7Vj604ppjqZ+Gqs0Ytw3HxQTOSXjQ=
+github.com/995933447/autoelect v0.0.0-20221205105211-eff1e99f1cfb/go.mod h1:Df++6C9g90CigOVZYxVUa+sS50Sb36M08nAgIN/bLZA=
 github.com/995933447/confloader v0.0.0-20221201090521-fc5ce6a68064 h1:GKjvc6hXFxuroXrPFYX9OIJVmwu6y0JLiBpk4nJ//9s=
 github.com/995933447/confloader v0.0.0-20221201090521-fc5ce6a68064/go.mod h1:52j1FekZ42S3gc7Fy8A54Mr0H5MVbEbRLo8rG/HRY5U=
 github.com/995933447/dbdriverutil v0.0.0-20220815160147-6e3336599c28 h1:HtmyDU4LIo74I4YrUFEBoNkoDtcKDEzykIdVmAKkyfY=
