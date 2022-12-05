@@ -46,7 +46,7 @@ type Logger interface {
 
 type Conf struct{
 	SysProcLogDir string `json:"sys_proc_log_dir"`
-	TaskProcLogDir string `json:"task_proc_log_dir"`
+	SessionProcLogDir string `json:"session_proc_log_dir"`
 	FileSize int64 `json:"file_size"`
 }
 
@@ -96,7 +96,7 @@ func MustGetSessLogger() Logger {
 	if sessionLogger != nil {
 		return sessionLogger
 	}
-	sessionLogger = NewLogger(conf.TaskProcLogDir, conf.FileSize)
+	sessionLogger = NewLogger(conf.SessionProcLogDir, conf.FileSize)
 	return sessionLogger
 }
 
