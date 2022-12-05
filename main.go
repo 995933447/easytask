@@ -66,7 +66,7 @@ type Conf struct {
 func main() {
 	ctx := contx.New("main", context.TODO())
 
-	conf, err := loadConf(ctx)
+	conf, errDuringWatchConf, err := loadConf(ctx)
 	if err != nil {
 		panic(any(err))
 	}
@@ -75,12 +75,23 @@ func main() {
 
 	defer recoverPanic(ctx)
 
-	taskRepo, taskCallbackSrvRepo, err := NewRepos(ctx, conf)
+	elect, errDuringElect, err := startElect(ctx, conf)
 	if err != nil {
 		panic(any(err))
 	}
 
-	elect, err := startElect(ctx, conf)
+	go func() {
+		select {
+		case err := <- errDuringWatchConf:
+			logger.MustGetSysLogger().Errorf(ctx, "watching config error:%s", err)
+			panic(any(err))
+		case err := <- errDuringElect:
+			logger.MustGetSysLogger().Errorf(ctx, "electing occur error:%s", err)
+			panic(any(err))
+		}
+	}()
+
+	taskRepo, taskCallbackSrvRepo, err := NewRepos(ctx, conf)
 	if err != nil {
 		panic(any(err))
 	}
@@ -119,26 +130,20 @@ func recoverPanic(ctx context.Context) {
 	}
 }
 
-func loadConf(ctx context.Context) (*Conf, error) {
+func loadConf(ctx context.Context) (*Conf, chan error, error) {
 	confFile := scan.OptStr("c")
 	var conf Conf
 	confLoader := confloader.NewLoader(confFile, 3, &conf)
 	if err := confLoader.Load(); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
-		return nil, err
+		return nil, nil, err
 	}
 	errCh := make(chan error)
-	go func() {
-		for {
-			err := <- errCh
-			panic(any(err))
-		}
-	}()
 	go confLoader.WatchToLoad(errCh)
-	return &conf, nil
+	return &conf, errCh, nil
 }
 
-func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error) {
+func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, chan error, error) {
 	var (
 		elect autoelect.AutoElection
 		err error
@@ -150,7 +155,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 		})
 		if err != nil {
 			logger.MustGetSysLogger().Error(ctx, err)
-			return nil, err
+			return nil, nil, err
 		}
 
 		elect, err = electfactory.NewAutoElection(
@@ -164,7 +169,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 		)
 		if err != nil {
 			logger.MustGetSysLogger().Error(ctx, err)
-			return nil, err
+			return nil, nil, err
 		}
 	case "redis":
 		var nodes []*redisgroup.Node
@@ -184,28 +189,19 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 		)
 		if err != nil {
 			logger.MustGetSysLogger().Error(ctx, err)
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	errDuringLoopCh := make(chan error)
 	go func() {
-		errDuringLoop := <- errDuringLoopCh
-		logger.MustGetSysLogger().Error(ctx, errDuringLoop)
-		panic(any(errDuringLoop))
-	}()
-
-	go func() {
 		if err = elect.LoopInElect(ctx, errDuringLoopCh); err != nil {
 			logger.MustGetSysLogger().Error(ctx, err)
+			errDuringLoopCh <- err
 		}
 	}()
-	if err != nil {
-		logger.MustGetSysLogger().Error(ctx, err)
-		return nil, err
-	}
 
-	return elect, nil
+	return nil, errDuringLoopCh, nil
 }
 
 func runRegistry(ctx context.Context, conf *Conf, taskCallbackSrvRepo repo.TaskCallbackSrvRepo, elect autoelect.AutoElection) {
