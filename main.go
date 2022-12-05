@@ -67,14 +67,14 @@ type Conf struct {
 }
 
 func main() {
-	conf, err := loadConf()
+	ctx := contx.New("main", context.TODO())
+
+	conf, err := loadConf(ctx)
 	if err != nil {
 		panic(any(err))
 	}
 
 	logger.Init(conf.LoggerConf)
-
-	ctx := contx.New("main", context.TODO())
 
 	defer recoverPanic(ctx)
 
@@ -121,11 +121,12 @@ func recoverPanic(ctx context.Context) {
 	}
 }
 
-func loadConf() (*Conf, error) {
+func loadConf(ctx context.Context) (*Conf, error) {
 	confFile := scan.OptStr("c")
 	var conf Conf
 	confLoader := confloader.NewLoader(confFile, 3, &conf)
 	if err := confLoader.Load(); err != nil {
+		logger.MustGetSysProcLogger().Error(ctx, err)
 		return nil, err
 	}
 	errCh := make(chan error)
@@ -150,6 +151,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 			Endpoints: conf.Endpoints,
 		})
 		if err != nil {
+			logger.MustGetSysProcLogger().Error(ctx, err)
 			return nil, err
 		}
 
@@ -163,6 +165,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 			),
 		)
 		if err != nil {
+			logger.MustGetSysProcLogger().Error(ctx, err)
 			return nil, err
 		}
 	case "redis":
@@ -170,9 +173,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 		for _, nodeConf := range conf.RedisConf.Nodes {
 			nodes = append(nodes, redisgroup.NewNode(nodeConf.Host, nodeConf.Port, nodeConf.Password))
 		}
-		logger := log.NewLogger(loggerwriters.NewStdoutLoggerWriter(print.ColorRed))
-		logger.SetLogLevel(log.LevelPanic)
-		redisGroup := redisgroup.NewGroup(nodes, logger)
+		redisGroup := redisgroup.NewGroup(nodes, logger.MustGetSysProcLogger().(*log.Logger))
 
 		elect, err = electfactory.NewAuthElection(
 			electfactory.ElectDriverGitDistribMu,
@@ -184,6 +185,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 			),
 		)
 		if err != nil {
+			logger.MustGetSysProcLogger().Error(ctx, err)
 			return nil, err
 		}
 	}
@@ -192,14 +194,16 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 	go func() {
 		errDuringLoop := <- errDuringLoopCh
 		logger.MustGetSysProcLogger().Error(ctx, errDuringLoop)
+		panic(any(errDuringLoop))
 	}()
 
 	go func() {
 		if err = elect.LoopInElect(ctx, errDuringLoopCh); err != nil {
-			return
+			logger.MustGetSysProcLogger().Error(ctx, err)
 		}
 	}()
 	if err != nil {
+		logger.MustGetSysProcLogger().Error(ctx, err)
 		return nil, err
 	}
 
@@ -224,9 +228,11 @@ func NewRepos(ctx context.Context, conf *Conf) (repo.TaskRepo, repo.TaskCallback
 		err error
 	)
 	if taskCallbackSrvRepo, err = mysqlrepo.NewTaskSrvRepo(ctx, conf.MysqlConf.ConnDsn); err != nil {
+		logger.MustGetSysProcLogger().Error(ctx, err)
 		return nil, nil, err
 	}
 	if taskRepo, err = mysqlrepo.NewTaskRepo(ctx, conf.MysqlConf.ConnDsn, taskCallbackSrvRepo); err != nil {
+		logger.MustGetSysProcLogger().Error(ctx, err)
 		return nil, nil, err
 	}
 	return taskRepo, taskCallbackSrvRepo, nil
