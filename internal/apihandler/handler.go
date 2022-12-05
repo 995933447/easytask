@@ -7,5 +7,6 @@ import (
 
 func AddTask(ctx context.Context, req *httpproto.AddTaskReq) (*httpproto.AddTaskResp, error) {
 	var resp httpproto.AddTaskResp
+
 	return &resp, nil
 }

@@ -20,7 +20,6 @@ import (
 type handlerReflect struct {
 	handler reflect.Value
 	req reflect.Type
-	resp reflect.Type
 }
 
 type Route struct {
@@ -82,9 +81,9 @@ func (r *Router) Register(ctx context.Context, route *Route) error {
 			return errInvalidHandler
 		}
 	}
-	
+
 	respType := handlerType.Out(0)
-	if respType.Kind() != reflect.Pointer {
+	if handlerType.Out(0).Kind() != reflect.Pointer {
 		if respType = respType.Elem(); respType.Kind() != reflect.Struct {
 			log.Error(ctx, errInvalidHandler)
 			return errInvalidHandler
@@ -105,7 +104,6 @@ func (r *Router) Register(ctx context.Context, route *Route) error {
 	methodToHandlerMap[route.Method] = &handlerReflect{
 		handler: reflect.ValueOf(route.Handler),
 		req: reqType,
-		resp: respType,
 	}
 	r.routeMap[route.Method] = methodToHandlerMap
 
