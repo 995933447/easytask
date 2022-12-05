@@ -2,7 +2,6 @@ package easytask
 
 import (
 	"context"
-	"fmt"
 	"github.com/995933447/autoelect"
 	electfactory "github.com/995933447/autoelect/factory"
 	"github.com/995933447/confloader"
@@ -49,7 +48,7 @@ type RedisConf struct {
 	Nodes []*RedisNodeConf `json:"nodes"`
 }
 
-type ApiServer struct {
+type ApiServerConf struct {
 	Host string `json:"host"`
 	Port int `json:"port"`
 }
@@ -64,7 +63,7 @@ type Conf struct {
 	*RedisConf `json:"redis"`
 	HealthCheckWorkerPoolSize uint `json:"health_check_worker_pool_size"`
 	LoggerConf *logger.Conf `json:"log"`
-	*ApiServer `json:"api_server"`
+	*ApiServerConf `json:"api_server"`
 }
 
 func main() {
@@ -73,11 +72,11 @@ func main() {
 		panic(any(err))
 	}
 
+	logger.Init(conf.LoggerConf)
+
 	ctx := contx.New("main", context.TODO())
 
-	defer RecoverPanic(ctx)
-
-	logger.Init(conf.LoggerConf)
+	defer recoverPanic(ctx)
 
 	taskRepo, taskCallbackSrvRepo, err := NewRepos(ctx, conf)
 	if err != nil {
@@ -108,7 +107,7 @@ func main() {
 	}
 }
 
-func RecoverPanic(ctx context.Context) {
+func recoverPanic(ctx context.Context) {
 	if err := recover(); err != nil {
 		logger.MustGetSysProcLogger().Errorf(ctx, "PROCESS PANIC: err %s", err)
 		stack := debug.Stack()
@@ -192,7 +191,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 	errDuringLoopCh := make(chan error)
 	go func() {
 		errDuringLoop := <- errDuringLoopCh
-		fmt.Println(errDuringLoop)
+		logger.MustGetSysProcLogger().Error(ctx, errDuringLoop)
 	}()
 
 	go func() {
@@ -243,7 +242,7 @@ func runTaskWorker(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, elec
 }
 
 func runApiServer(ctx context.Context, conf *Conf) error {
-	router := apihandler.NewRouter(conf.ApiServer.Host, conf.ApiServer.Port)
+	router := apihandler.NewRouter(conf.ApiServerConf.Host, conf.ApiServerConf.Port)
 	if err := router.Register(ctx, "task", http.MethodPost, apihandler.AddTask); err != nil {
 		logger.MustGetSysProcLogger().Error(ctx, err)
 		return err
