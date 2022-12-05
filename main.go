@@ -99,7 +99,7 @@ func main() {
 	}()
 	signal.Notify(signCh, syscall.SIGINT, syscall.SIGTERM)
 
-	if err = runApiServer(ctx, conf); err != nil {
+	if err = runApiServer(ctx, conf, taskRepo, taskCallbackSrvRepo); err != nil {
 		panic(any(err))
 	}
 }
