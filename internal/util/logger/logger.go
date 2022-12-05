@@ -101,7 +101,13 @@ func MustGetSessLogger() Logger {
 }
 
 func NewLogger(baseDir string, maxFileSize int64) Logger {
-	writer := loggerwriters.NewFileLoggerWriter(baseDir, maxFileSize, 5, loggerwriters.OpenNewFileByByDateHour, 100000)
+	writer := loggerwriters.NewFileLoggerWriter(
+		baseDir,
+		maxFileSize,
+		5,
+		loggerwriters.OpenNewFileByByDateHour,
+		100000,
+		)
 	go func() {
 		err := writer.Loop()
 		if err != nil {
