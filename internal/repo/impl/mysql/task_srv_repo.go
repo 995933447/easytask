@@ -19,7 +19,7 @@ type TaskSrvRepo struct {
 }
 
 func (r *TaskSrvRepo) AddSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv) error {
-	log := logger.MustGetSysProcLogger()
+	log := logger.MustGetSysLogger()
 	conn := r.mustGetConn(ctx)
 	var srvModel TaskCallbackSrvModel
 	if err := conn.Where(DbFieldName + " = ?", srv.GetName()).Take(&srvModel).Error; err != nil {
@@ -99,7 +99,7 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 	var (
 		srvModel TaskCallbackSrvModel
 		conn = r.mustGetConn(ctx)
-		log = logger.MustGetSysProcLogger()
+		log = logger.MustGetSysLogger()
 	)
 	err := conn.Where(DbFieldName + " = ?", srv.GetName()).Take(&srvModel).Error
 	if err != nil {
@@ -128,7 +128,7 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 
 func (r *TaskSrvRepo) SetSrvRoutesPassHealthCheck(ctx context.Context, srv *task.TaskCallbackSrv) error {
 	var (
-		log = logger.MustGetSysProcLogger()
+		log = logger.MustGetSysLogger()
 		srvModel TaskCallbackSrvModel
 	)
 	if len(srv.GetRoutes()) == 0 {
@@ -180,14 +180,14 @@ func (r *TaskSrvRepo) GetSrvsByIds(ctx context.Context, ids []string) ([]*task.T
 		optionstream.NewQueryStream(nil, int64(len(ids)), 0).SetOption(repo.QueryOptKeyInIds, ids),
 		)
 	if err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, err
 	}
 	return srvs, nil
 }
 
 func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.QueryStream) ([]*task.TaskCallbackSrv, error) {
-	log := logger.MustGetSysProcLogger()
+	log := logger.MustGetSysLogger()
 	conn :=  r.mustGetConn(ctx)
 	err := optionstream.NewQueryStreamProcessor(queryStream).
 		OnStringList(repo.QueryOptKeyInIds, func(val []string) error {
@@ -259,7 +259,7 @@ func NewTaskSrvRepo(ctx context.Context, connDsn string) (*TaskSrvRepo, error) {
 	}
 	if !migratedTaskSrvRepoDB.Load() {
 		if err := srvRepo.mustGetConn(ctx).AutoMigrate(&TaskCallbackSrvModel{}, &TaskCallbackSrvRouteModel{}); err != nil {
-			logger.MustGetSysProcLogger().Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 			return nil, err
 		}
 	}

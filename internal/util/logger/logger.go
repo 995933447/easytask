@@ -61,43 +61,43 @@ func hasInit() bool {
 }
 
 var (
-	sysProcLogger Logger
-	newSysProcLoggerMu sync.Mutex
+	sysLogger Logger
+	newSysLoggerMu sync.Mutex
 
-	sessionProcLogger Logger
-	newSessionProcLoggerMu sync.Mutex
+	sessionLogger Logger
+	newSessionLoggerMu sync.Mutex
 )
 
-func MustGetSysProcLogger() Logger {
+func MustGetSysLogger() Logger {
 	if !hasInit() {
 		panic(any("init not finish"))
 	}
-	if sysProcLogger != nil {
-		return sysProcLogger
+	if sysLogger != nil {
+		return sysLogger
 	}
-	newSysProcLoggerMu.Lock()
-	defer newSessionProcLoggerMu.Unlock()
-	if sysProcLogger != nil {
-		return sysProcLogger
+	newSysLoggerMu.Lock()
+	defer newSessionLoggerMu.Unlock()
+	if sysLogger != nil {
+		return sysLogger
 	}
-	sysProcLogger = NewLogger(conf.SysProcLogDir, conf.FileSize)
-	return sysProcLogger
+	sysLogger = NewLogger(conf.SysProcLogDir, conf.FileSize)
+	return sysLogger
 }
 
-func MustGetSessProcLogger() Logger {
+func MustGetSessLogger() Logger {
 	if !hasInit() {
 		panic(any("init not finish"))
 	}
-	if sessionProcLogger != nil {
-		return sessionProcLogger
+	if sessionLogger != nil {
+		return sessionLogger
 	}
-	newSessionProcLoggerMu.Lock()
-	defer newSessionProcLoggerMu.Unlock()
-	if sessionProcLogger != nil {
-		return sessionProcLogger
+	newSessionLoggerMu.Lock()
+	defer newSessionLoggerMu.Unlock()
+	if sessionLogger != nil {
+		return sessionLogger
 	}
-	sessionProcLogger = NewLogger(conf.TaskProcLogDir, conf.FileSize)
-	return sessionProcLogger
+	sessionLogger = NewLogger(conf.TaskProcLogDir, conf.FileSize)
+	return sessionLogger
 }
 
 func NewLogger(baseDir string, maxFileSize int64) Logger {

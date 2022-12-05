@@ -20,7 +20,7 @@ type Sched struct {
 func (s *Sched) LockTaskForRun(ctx context.Context, task *task.Task) (bool, error) {
 	locked, err := s.taskRepo.LockTask(ctx, task)
 	if err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return false, err
 	}
 	return locked, nil
@@ -44,7 +44,7 @@ func (s *Sched) schedule(ctx context.Context) {
 
 		tasks, err := s.taskRepo.TimeoutTasks(ctx, 1000)
 		if err != nil {
-			logger.MustGetSysProcLogger().Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 			continue
 		}
 
@@ -81,7 +81,7 @@ func (s *Sched) watchToConfirmTaskRes(ctx context.Context) {
 
 		err := s.taskRepo.ConfirmTasks(ctx, taskResps)
 		if err != nil {
-			logger.MustGetSysProcLogger().Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 		}
 	}
 }

@@ -33,7 +33,7 @@ func (c *repoConnector) getConn(ctx context.Context) (*gorm.DB, error) {
 	}
 	var err error
 	if c.conn, err = gorm.Open(mysql.Open(c.connDsn), &gorm.Config{}); err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, err
 	}
 	return c.conn.WithContext(ctx), nil

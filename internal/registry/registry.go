@@ -49,7 +49,7 @@ func NewRegistry(
 // 注册路由，如果服务名称已经存在，则增量添加路由
 func (r *Registry) Register(ctx context.Context, srv *task.TaskCallbackSrv) error {
 	if err := r.srvRepo.AddSrvRoutes(ctx, srv); err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}
 	return nil
@@ -58,7 +58,7 @@ func (r *Registry) Register(ctx context.Context, srv *task.TaskCallbackSrv) erro
 // 删除路由
 func (r *Registry) Unregister(ctx context.Context, srv *task.TaskCallbackSrv) error {
 	if err := r.srvRepo.DelSrvRoutes(ctx, srv); err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}
 	return nil
@@ -67,7 +67,7 @@ func (r *Registry) Unregister(ctx context.Context, srv *task.TaskCallbackSrv) er
 func (r *Registry) HeathCheck(ctx context.Context) error {
 	if r.isClusterMode && !r.elect.IsMaster() {
 		err := errs.ErrCurrentNodeNoMaster
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}
 
@@ -77,7 +77,7 @@ func (r *Registry) HeathCheck(ctx context.Context) error {
 	for {
 		srvs, err := r.srvRepo.GetSrvs(ctx, queryStream)
 		if err != nil {
-			logger.MustGetSysProcLogger().Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 			return err
 		}
 
@@ -101,7 +101,7 @@ func (r *Registry) Run(ctx context.Context) {
 func (r *Registry) sched(ctx context.Context) {
 	for {
 		if err := r.HeathCheck(ctx); err != nil {
-			logger.MustGetSysProcLogger().Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 		}
 		time.Sleep(time.Duration(r.checkHealthIntervalSec) * time.Second)
 	}
@@ -139,7 +139,7 @@ func (r *Registry) createHealthCheckWorkerPool(ctx context.Context) {
 			}
 			for _, srv := range withNoReplyRouteSrvs {
 				if err := r.srvRepo.DelSrvRoutes(ctx, srv); err != nil {
-					logger.MustGetSysProcLogger().Error(ctx, err)
+					logger.MustGetSysLogger().Error(ctx, err)
 				}
 			}
 		case withReplyRouteSrv := <- withReplyRouteSrvCh:
@@ -159,7 +159,7 @@ func (r *Registry) createHealthCheckWorkerPool(ctx context.Context) {
 
 			for _, srv := range withReplyRouteSrvs {
 				if err := r.srvRepo.SetSrvRoutesPassHealthCheck(ctx, srv); err != nil {
-					logger.MustGetSysProcLogger().Error(ctx, err)
+					logger.MustGetSysLogger().Error(ctx, err)
 				}
 			}
 		}
@@ -170,7 +170,7 @@ func (r *Registry) runWorker(ctx context.Context, withNoReplyRouteSrvCh, withRep
 	srv := <- r.readyCheckSrvChan
 	heatBeatResp, err := r.callbackSrvExec.HeartBeat(ctx, srv)
 	if err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return
 	}
 	withNoReplyRouteSrvCh <- task.NewTaskCallbackSrv(srv.GetName(), heatBeatResp.GetNoReplyRoutes(), true)

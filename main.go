@@ -106,15 +106,15 @@ func main() {
 
 func recoverPanic(ctx context.Context) {
 	if err := recover(); err != nil {
-		logger.MustGetSysProcLogger().Errorf(ctx, "PROCESS PANIC: err %s", err)
+		logger.MustGetSysLogger().Errorf(ctx, "PROCESS PANIC: err %s", err)
 		stack := debug.Stack()
 		if len(stack) > 0 {
 			lines := strings.Split(string(stack), "\n")
 			for _, line := range lines {
-				logger.MustGetSysProcLogger().Error(ctx, line)
+				logger.MustGetSysLogger().Error(ctx, line)
 			}
 		}
-		logger.MustGetSysProcLogger().Errorf(ctx, "stack is empty (%s)", err)
+		logger.MustGetSysLogger().Errorf(ctx, "stack is empty (%s)", err)
 	}
 }
 
@@ -123,7 +123,7 @@ func loadConf(ctx context.Context) (*Conf, error) {
 	var conf Conf
 	confLoader := confloader.NewLoader(confFile, 3, &conf)
 	if err := confLoader.Load(); err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, err
 	}
 	errCh := make(chan error)
@@ -148,7 +148,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 			Endpoints: conf.Endpoints,
 		})
 		if err != nil {
-			logger.MustGetSysProcLogger().Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 			return nil, err
 		}
 
@@ -162,7 +162,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 			),
 		)
 		if err != nil {
-			logger.MustGetSysProcLogger().Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 			return nil, err
 		}
 	case "redis":
@@ -170,7 +170,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 		for _, nodeConf := range conf.RedisConf.Nodes {
 			nodes = append(nodes, redisgroup.NewNode(nodeConf.Host, nodeConf.Port, nodeConf.Password))
 		}
-		redisGroup := redisgroup.NewGroup(nodes, logger.MustGetSysProcLogger().(*log.Logger))
+		redisGroup := redisgroup.NewGroup(nodes, logger.MustGetSysLogger().(*log.Logger))
 
 		elect, err = electfactory.NewAuthElection(
 			electfactory.ElectDriverGitDistribMu,
@@ -182,7 +182,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 			),
 		)
 		if err != nil {
-			logger.MustGetSysProcLogger().Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 			return nil, err
 		}
 	}
@@ -190,17 +190,17 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, error)
 	errDuringLoopCh := make(chan error)
 	go func() {
 		errDuringLoop := <- errDuringLoopCh
-		logger.MustGetSysProcLogger().Error(ctx, errDuringLoop)
+		logger.MustGetSysLogger().Error(ctx, errDuringLoop)
 		panic(any(errDuringLoop))
 	}()
 
 	go func() {
 		if err = elect.LoopInElect(ctx, errDuringLoopCh); err != nil {
-			logger.MustGetSysProcLogger().Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 		}
 	}()
 	if err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, err
 	}
 
@@ -225,11 +225,11 @@ func NewRepos(ctx context.Context, conf *Conf) (repo.TaskRepo, repo.TaskCallback
 		err error
 	)
 	if taskCallbackSrvRepo, err = mysqlrepo.NewTaskSrvRepo(ctx, conf.MysqlConf.ConnDsn); err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, nil, err
 	}
 	if taskRepo, err = mysqlrepo.NewTaskRepo(ctx, conf.MysqlConf.ConnDsn, taskCallbackSrvRepo); err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, nil, err
 	}
 	return taskRepo, taskCallbackSrvRepo, nil
@@ -247,11 +247,11 @@ func runTaskWorker(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, elec
 func runApiServer(ctx context.Context, conf *Conf) error {
 	router := apihandler.NewRouter(conf.ApiServerConf.Host, conf.ApiServerConf.Port)
 	if err := router.RegisterBatch(ctx, apiRoutes); err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}
 	if err := router.Boot(ctx); err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}
 	return nil

@@ -21,7 +21,7 @@ type TaskRepo struct {
 }
 
 func (r *TaskRepo) TimeoutTasks(ctx context.Context, size int) ([]*task.Task, error) {
-	log := logger.MustGetSysProcLogger()
+	log := logger.MustGetSysLogger()
 	
 	var taskModels []*TaskModel
 	err := r.mustGetConn(ctx).
@@ -63,7 +63,7 @@ func (r *TaskRepo) TimeoutTasks(ctx context.Context, size int) ([]*task.Task, er
 
 func (r *TaskRepo) LockTask(ctx context.Context, oneTask *task.Task) (bool, error) {
 	var (
-		log = logger.MustGetSysProcLogger()
+		log = logger.MustGetSysLogger()
 		now = time.Now().Unix()
 		taskModelUpdates = map[string]interface{}{
 			DbFieldLastRunAt: now,
@@ -122,7 +122,7 @@ func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 	conn := r.mustGetConn(ctx)
 	taskModelId, err := toTaskModelId(resp.GetTaskId())
 	taskStatus := statusRunning
-	log := logger.MustGetSysProcLogger()
+	log := logger.MustGetSysLogger()
 
 	if task.IsTaskSuccess(resp.GetTaskStatus()) {
 		err = conn.Model(&TaskModel{}).
@@ -166,7 +166,7 @@ func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 }
 
 func (r *TaskRepo) ConfirmTasks(ctx context.Context, resps []*task.TaskResp) error {
-	log := logger.MustGetSysProcLogger()
+	log := logger.MustGetSysLogger()
 
 	var (
 		successTaskModelIds, failedTaskModelIds []uint64
@@ -290,7 +290,7 @@ func NewTaskRepo(ctx context.Context, connDsn string, srvRepo repo.TaskCallbackS
 
 	if !migratedTaskRepoDB.Load() {
 		if err := taskRepo.mustGetConn(ctx).AutoMigrate(&TaskModel{}); err != nil {
-			logger.MustGetSysProcLogger().Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 			return nil, err
 		}
 	}

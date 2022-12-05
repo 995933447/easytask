@@ -237,7 +237,7 @@ func (t *Task) IncrRunTimes() {
 func (t *Task) run(ctx context.Context, callbackExec callbacksrvexec.TaskCallbackSrvExec) (*TaskResp, error) {
 	callbackResp, err := callbackExec.CallbackSrv(ctx, t, nil)
 	if err != nil {
-		logger.MustGetSysProcLogger().Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, err
 	}
 
