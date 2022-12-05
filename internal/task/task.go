@@ -170,6 +170,7 @@ func NewTaskCallbackSrv(name string, routes []*TaskCallbackSrvRoute, hasEnableHe
 type Task struct {
 	id string
 	callbackSrv *TaskCallbackSrv
+	callbackPath string
 	name string
 	arg []byte
 	runTimes int
@@ -217,6 +218,10 @@ func (t *Task) GetCallbackSrv() *TaskCallbackSrv {
 	return t.callbackSrv
 }
 
+func (t *Task) GetCallbackPath() string {
+	return t.callbackPath
+}
+
 func (t *Task) GetArg() []byte {
 	return t.arg
 }
@@ -232,7 +237,7 @@ func (t *Task) IncrRunTimes() {
 func (t *Task) run(ctx context.Context, callbackExec callbacksrvexec.TaskCallbackSrvExec) (*TaskResp, error) {
 	callbackResp, err := callbackExec.CallbackSrv(ctx, t, nil)
 	if err != nil {
-		logger.MustGetTaskProcLogger().Error(ctx, err)
+		logger.MustGetSysProcLogger().Error(ctx, err)
 		return nil, err
 	}
 
@@ -248,9 +253,10 @@ func (t *Task) run(ctx context.Context, callbackExec callbacksrvexec.TaskCallbac
 	return newTaskResp(t.id, callbackResp.IsRunInAsync(), status, t.runTimes, callbackResp.GetExtra()), nil
 }
 
-type NewTaskInput struct {
+type NewTaskReq struct {
 	Id string
 	CallbackSrv *TaskCallbackSrv `validate:"required"`
+	CallbackPath string `json:"callback_path"`
 	Name string `validate:"required"`
 	Arg []byte `validate:"required"`
 	RunTimes int
@@ -262,27 +268,28 @@ type NewTaskInput struct {
 	TimeIntervalSec int
 }
 
-func (input *NewTaskInput) Check() error {
-	return validator.New().Struct(input)
+func (r *NewTaskReq) Check() error {
+	return validator.New().Struct(r)
 }
 
-func NewTask(input *NewTaskInput) (*Task, error) {
+func NewTask(req *NewTaskReq) (*Task, error) {
 	// checking if forgot set field
-	if err := input.Check(); err != nil {
+	if err := req.Check(); err != nil {
 		return nil, err
 	}
 	return &Task{
-		id: input.Id,
-		name: input.Name,
-		arg: input.Arg,
-		runTimes: input.RunTimes,
-		callbackSrv: input.CallbackSrv,
-		allowMaxRunTimes: input.AllowMaxRunTimes,
-		lastRunAt: input.LastRunAt,
-		maxRunTimeSec: input.MaxRunTimeSec,
-		schedMode: input.SchedMode,
-		timeCronExpr: input.TimeCronExpr,
-		timeIntervalSec: input.TimeIntervalSec,
+		id: req.Id,
+		name: req.Name,
+		arg: req.Arg,
+		runTimes: req.RunTimes,
+		callbackSrv: req.CallbackSrv,
+		callbackPath: req.CallbackPath,
+		allowMaxRunTimes: req.AllowMaxRunTimes,
+		lastRunAt: req.LastRunAt,
+		maxRunTimeSec: req.MaxRunTimeSec,
+		schedMode: req.SchedMode,
+		timeCronExpr: req.TimeCronExpr,
+		timeIntervalSec: req.TimeIntervalSec,
 	}, nil
 }
 

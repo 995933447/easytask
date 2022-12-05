@@ -57,7 +57,7 @@ func (t *TaskModel) toEntity(callbackSrv *task.TaskCallbackSrv) (*task.Task, err
 	if err != nil {
 		return nil, err
 	}
-	return task.NewTask(&task.NewTaskInput{
+	return task.NewTask(&task.NewTaskReq{
 		Id: t.toEntityId(),
 		Name: t.Name,
 		Arg: t.Arg,
@@ -128,6 +128,10 @@ func toCallbackSrvRouteEntityId(modelId uint64) string {
 
 func (m *TaskCallbackSrvRouteModel) toEntityId() string {
 	return toCallbackSrvRouteEntityId(m.Id)
+}
+
+func toCallbackSrvRouteModelId(entityId string) (uint64, error) {
+	return strconv.ParseUint(entityId, 10, 64)
 }
 
 func (m *TaskCallbackSrvRouteModel) toEntity() *task.TaskCallbackSrvRoute {

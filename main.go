@@ -7,6 +7,7 @@ import (
 	electfactory "github.com/995933447/autoelect/factory"
 	"github.com/995933447/confloader"
 	distribmufactory "github.com/995933447/distribmu/factory"
+	"github.com/995933447/easytask/internal/apihandler"
 	callbacksrvexecimpl "github.com/995933447/easytask/internal/callbacksrvexec/impl"
 	"github.com/995933447/easytask/internal/registry"
 	"github.com/995933447/easytask/internal/repo"
@@ -14,13 +15,14 @@ import (
 	"github.com/995933447/easytask/internal/sched"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
-	"github.com/995933447/easytask/pkg/cntx"
+	"github.com/995933447/easytask/pkg/contx"
 	"github.com/995933447/log-go"
 	"github.com/995933447/log-go/impls/loggerwriters"
 	"github.com/995933447/redisgroup"
 	"github.com/995933447/std-go/print"
 	"github.com/995933447/std-go/scan"
 	"github.com/etcd-io/etcd/client"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -47,6 +49,11 @@ type RedisConf struct {
 	Nodes []*RedisNodeConf `json:"nodes"`
 }
 
+type ApiServer struct {
+	Host string `json:"host"`
+	Port int `json:"port"`
+}
+
 type Conf struct {
 	IsClusterMode bool 	`json:"is_cluster_mode"`
 	ClusterName string `json:"cluster_name"`
@@ -57,6 +64,7 @@ type Conf struct {
 	*RedisConf `json:"redis"`
 	HealthCheckWorkerPoolSize uint `json:"health_check_worker_pool_size"`
 	LoggerConf *logger.Conf `json:"log"`
+	*ApiServer `json:"api_server"`
 }
 
 func main() {
@@ -65,13 +73,13 @@ func main() {
 		panic(any(err))
 	}
 
-	ctx := cntx.New("main")
+	ctx := contx.New("main", context.TODO())
 
 	defer RecoverPanic(ctx)
 
 	logger.Init(conf.LoggerConf)
 
-	taskRepo, taskCallbackSrvRepo, err := NewRepos(conf)
+	taskRepo, taskCallbackSrvRepo, err := NewRepos(ctx, conf)
 	if err != nil {
 		panic(any(err))
 	}
@@ -94,19 +102,23 @@ func main() {
 		}
 	}()
 	signal.Notify(signCh, syscall.SIGINT, syscall.SIGTERM)
+
+	if err = runApiServer(ctx, conf); err != nil {
+		panic(any(err))
+	}
 }
 
 func RecoverPanic(ctx context.Context) {
 	if err := recover(); err != nil {
-		logger.MustGetMainProcLogger().Errorf(ctx, "PROCESS PANIC: err %s", err)
+		logger.MustGetSysProcLogger().Errorf(ctx, "PROCESS PANIC: err %s", err)
 		stack := debug.Stack()
 		if len(stack) > 0 {
 			lines := strings.Split(string(stack), "\n")
 			for _, line := range lines {
-				logger.MustGetMainProcLogger().Error(ctx, line)
+				logger.MustGetSysProcLogger().Error(ctx, line)
 			}
 		}
-		logger.MustGetMainProcLogger().Errorf(ctx, "stack is empty (%s)", err)
+		logger.MustGetSysProcLogger().Errorf(ctx, "stack is empty (%s)", err)
 	}
 }
 
@@ -120,7 +132,8 @@ func loadConf() (*Conf, error) {
 	errCh := make(chan error)
 	go func() {
 		for {
-			_ = <- errCh
+			err := <- errCh
+			panic(any(err))
 		}
 	}()
 	go confLoader.WatchToLoad(errCh)
@@ -205,16 +218,16 @@ func runRegistry(ctx context.Context, conf *Conf, taskCallbackSrvRepo repo.TaskC
 	go reg.Run(ctx)
 }
 
-func NewRepos(conf *Conf) (repo.TaskRepo, repo.TaskCallbackSrvRepo, error) {
+func NewRepos(ctx context.Context, conf *Conf) (repo.TaskRepo, repo.TaskCallbackSrvRepo, error) {
 	var (
 		taskRepo repo.TaskRepo
 		taskCallbackSrvRepo repo.TaskCallbackSrvRepo
 		err error
 	)
-	if taskCallbackSrvRepo, err = mysqlrepo.NewTaskSrvRepo(conf.MysqlConf.ConnDsn); err != nil {
+	if taskCallbackSrvRepo, err = mysqlrepo.NewTaskSrvRepo(ctx, conf.MysqlConf.ConnDsn); err != nil {
 		return nil, nil, err
 	}
-	if taskRepo, err = mysqlrepo.NewTaskRepo(conf.MysqlConf.ConnDsn, taskCallbackSrvRepo); err != nil {
+	if taskRepo, err = mysqlrepo.NewTaskRepo(ctx, conf.MysqlConf.ConnDsn, taskCallbackSrvRepo); err != nil {
 		return nil, nil, err
 	}
 	return taskRepo, taskCallbackSrvRepo, nil
@@ -227,4 +240,17 @@ func runTaskWorker(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, elec
 		callbacksrvexecimpl.NewHttpExec(),
 		)
 	go engine.Run(ctx)
+}
+
+func runApiServer(ctx context.Context, conf *Conf) error {
+	router := apihandler.NewRouter(conf.ApiServer.Host, conf.ApiServer.Port)
+	if err := router.Register(ctx, "task", http.MethodPost, apihandler.AddTask); err != nil {
+		logger.MustGetSysProcLogger().Error(ctx, err)
+		return err
+	}
+	if err := router.Boot(ctx); err != nil {
+		logger.MustGetSysProcLogger().Error(ctx, err)
+		return err
+	}
+	return nil
 }

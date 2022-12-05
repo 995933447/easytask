@@ -8,8 +8,11 @@ import (
 	"github.com/995933447/reflectutil"
 	"github.com/gorhill/cronexpr"
 	"gorm.io/gorm"
+	"sync/atomic"
 	"time"
 )
+
+var migratedTaskRepoDB atomic.Bool
 
 type TaskRepo struct {
 	srvRepo repo.TaskCallbackSrvRepo
@@ -18,9 +21,10 @@ type TaskRepo struct {
 }
 
 func (r *TaskRepo) TimeoutTasks(ctx context.Context, size int) ([]*task.Task, error) {
+	log := logger.MustGetSysProcLogger()
+	
 	var taskModels []*TaskModel
-
-	err := r.mustGetConn().
+	err := r.mustGetConn(ctx).
 		WithContext(ctx).
 		Where(DbFieldRunTimes + " < " + DbFieldAllowMaxRunTimes).
 		Where(DbFieldPlanSchedNextAt + " <= ?", time.Now().Unix()).
@@ -28,7 +32,7 @@ func (r *TaskRepo) TimeoutTasks(ctx context.Context, size int) ([]*task.Task, er
 		Scan(&taskModels).
 		Error
 	if err != nil {
-		logger.MustGetMainProcLogger().Error(ctx, err)
+		log.Error(ctx, err)
 		return nil, err
 	}
 
@@ -39,7 +43,7 @@ func (r *TaskRepo) TimeoutTasks(ctx context.Context, size int) ([]*task.Task, er
 	}
 	callbackSrvs, err := r.srvRepo.GetSrvsByIds(ctx, callbackSrvIds)
 	if err != nil {
-		logger.MustGetMainProcLogger().Error(ctx, err)
+		log.Error(ctx, err)
 		return nil, err
 	}
 
@@ -59,6 +63,7 @@ func (r *TaskRepo) TimeoutTasks(ctx context.Context, size int) ([]*task.Task, er
 
 func (r *TaskRepo) LockTask(ctx context.Context, oneTask *task.Task) (bool, error) {
 	var (
+		log = logger.MustGetSysProcLogger()
 		now = time.Now().Unix()
 		taskModelUpdates = map[string]interface{}{
 			DbFieldLastRunAt: now,
@@ -71,6 +76,7 @@ func (r *TaskRepo) LockTask(ctx context.Context, oneTask *task.Task) (bool, erro
 	case task.SchedModeTimeCron:
 		expr, err := cronexpr.Parse(oneTask.GetTimeCronExpr())
 		if err != nil {
+			log.Error(ctx, err)
 			return false, err
 		}
 		taskModelUpdates[DbFieldPlanSchedNextAt] = expr.Next(time.Now()).Unix()
@@ -78,9 +84,10 @@ func (r *TaskRepo) LockTask(ctx context.Context, oneTask *task.Task) (bool, erro
 
 	taskModelId, err := toTaskModelId(oneTask.GetId())
 	if err != nil {
+		log.Error(ctx, err)
 		return false, err
 	}
-	conn := r.mustGetConn()
+	conn := r.mustGetConn(ctx)
 	res := conn.WithContext(ctx).
 		Model(&TaskModel{}).
 		Where(DbFieldId + " = ?", taskModelId).
@@ -88,6 +95,7 @@ func (r *TaskRepo) LockTask(ctx context.Context, oneTask *task.Task) (bool, erro
 		Where(DbFieldRunTimes + " = ?", oneTask.GetRunTimes()).
 		Updates(taskModelUpdates)
 	if res.Error != nil {
+		log.Error(ctx, res.Error)
 		return false, res.Error
 	}
 
@@ -101,6 +109,7 @@ func (r *TaskRepo) LockTask(ctx context.Context, oneTask *task.Task) (bool, erro
 			TryTimes: oneTask.GetRunTimes(),
 		}).Error
 		if err != nil {
+			log.Error(ctx, err)
 			return false, err
 		}
 	}
@@ -110,9 +119,10 @@ func (r *TaskRepo) LockTask(ctx context.Context, oneTask *task.Task) (bool, erro
 
 func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 	now := time.Now().Unix()
-	conn := r.mustGetConn().WithContext(ctx)
+	conn := r.mustGetConn(ctx)
 	taskModelId, err := toTaskModelId(resp.GetTaskId())
 	taskStatus := statusRunning
+	log := logger.MustGetSysProcLogger()
 
 	if task.IsTaskSuccess(resp.GetTaskStatus()) {
 		err = conn.Model(&TaskModel{}).
@@ -121,6 +131,7 @@ func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 				DbFieldLastSuccessAt: now,
 			}).Error
 		if err != nil {
+			log.Error(ctx, err)
 			return err
 		}
 		taskStatus = statusSuccess
@@ -133,6 +144,7 @@ func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 				DbFieldLastFailedAt: now,
 			}).Error
 		if err != nil {
+			log.Error(ctx, err)
 			return err
 		}
 		taskStatus = statusFailed
@@ -146,6 +158,7 @@ func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 			DbFieldTaskStatus: taskStatus,
 		}).Error
 	if err != nil {
+		log.Error(ctx, err)
 		return err
 	}
 
@@ -153,6 +166,8 @@ func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 }
 
 func (r *TaskRepo) ConfirmTasks(ctx context.Context, resps []*task.TaskResp) error {
+	log := logger.MustGetSysProcLogger()
+
 	var (
 		successTaskModelIds, failedTaskModelIds []uint64
 		runTimesToRunningAsyncTaskModelIdsMap = make(map[int][]uint64)
@@ -162,9 +177,9 @@ func (r *TaskRepo) ConfirmTasks(ctx context.Context, resps []*task.TaskResp) err
 	for _, resp := range resps {
 		taskModelId, err := toTaskModelId(resp.GetTaskId())
 		if err != nil {
+			log.Error(ctx, err)
 			return err
 		}
-
 
 		taskRunTimes := resp.GetTaskRunTimes()
 
@@ -198,13 +213,14 @@ func (r *TaskRepo) ConfirmTasks(ctx context.Context, resps []*task.TaskResp) err
 	}
 
 	now := time.Now().Unix()
-	conn := r.mustGetConn().WithContext(ctx)
+	conn := r.mustGetConn(ctx)
 	if len(successTaskModelIds) > 0 {
 		err := conn.Where(DbFieldId + " IN ?", successTaskModelIds).
 			Updates(map[string]interface{}{
 				DbFieldLastSuccessAt: now,
 			}).Error
 		if err != nil {
+			log.Error(ctx, err)
 			return err
 		}
 	}
@@ -215,6 +231,7 @@ func (r *TaskRepo) ConfirmTasks(ctx context.Context, resps []*task.TaskResp) err
 				DbFieldLastFailedAt: now,
 			}).Error
 		if err != nil {
+			log.Error(ctx, err)
 			return err
 		}
 	}
@@ -227,6 +244,7 @@ func (r *TaskRepo) ConfirmTasks(ctx context.Context, resps []*task.TaskResp) err
 				DbFieldIsRunInAsync: true,
 			}).Error
 		if err != nil {
+			log.Error(ctx, err)
 			return err
 		}
 	}
@@ -240,6 +258,7 @@ func (r *TaskRepo) ConfirmTasks(ctx context.Context, resps []*task.TaskResp) err
 				DbFieldTaskStatus: statusSuccess,
 			}).Error
 		if err != nil {
+			log.Error(ctx, err)
 			return err
 		}
 	}
@@ -253,6 +272,7 @@ func (r *TaskRepo) ConfirmTasks(ctx context.Context, resps []*task.TaskResp) err
 				DbFieldTaskStatus: statusFailed,
 			}).Error
 		if err != nil {
+			log.Error(ctx, err)
 			return err
 		}
 	}
@@ -260,7 +280,7 @@ func (r *TaskRepo) ConfirmTasks(ctx context.Context, resps []*task.TaskResp) err
 	return nil
 }
 
-func NewTaskRepo(connDsn string, srvRepo repo.TaskCallbackSrvRepo) (*TaskRepo, error) {
+func NewTaskRepo(ctx context.Context, connDsn string, srvRepo repo.TaskCallbackSrvRepo) (*TaskRepo, error) {
 	taskRepo := &TaskRepo{
 		srvRepo: srvRepo,
 		repoConnector: repoConnector{
@@ -268,8 +288,11 @@ func NewTaskRepo(connDsn string, srvRepo repo.TaskCallbackSrvRepo) (*TaskRepo, e
 		},
 	}
 
-	if err := taskRepo.mustGetConn().AutoMigrate(&TaskModel{}); err != nil {
-		return nil, err
+	if !migratedTaskRepoDB.Load() {
+		if err := taskRepo.mustGetConn(ctx).AutoMigrate(&TaskModel{}); err != nil {
+			logger.MustGetSysProcLogger().Error(ctx, err)
+			return nil, err
+		}
 	}
 
 	return taskRepo, nil

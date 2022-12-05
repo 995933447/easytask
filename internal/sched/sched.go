@@ -5,6 +5,7 @@ import (
 	"github.com/995933447/autoelect"
 	"github.com/995933447/easytask/internal/repo"
 	"github.com/995933447/easytask/internal/task"
+	"github.com/995933447/easytask/internal/util/logger"
 	"time"
 )
 
@@ -17,7 +18,12 @@ type Sched struct {
 }
 
 func (s *Sched) LockTaskForRun(ctx context.Context, task *task.Task) (bool, error) {
-	return s.taskRepo.LockTask(ctx, task)
+	locked, err := s.taskRepo.LockTask(ctx, task)
+	if err != nil {
+		logger.MustGetSysProcLogger().Error(ctx, err)
+		return false, err
+	}
+	return locked, nil
 }
 
 func (s *Sched) TaskWorkerReady(taskIn chan *task.Task) {
@@ -38,6 +44,7 @@ func (s *Sched) schedule(ctx context.Context) {
 
 		tasks, err := s.taskRepo.TimeoutTasks(ctx, 1000)
 		if err != nil {
+			logger.MustGetSysProcLogger().Error(ctx, err)
 			continue
 		}
 
@@ -74,7 +81,7 @@ func (s *Sched) watchToConfirmTaskRes(ctx context.Context) {
 
 		err := s.taskRepo.ConfirmTasks(ctx, taskResps)
 		if err != nil {
-
+			logger.MustGetSysProcLogger().Error(ctx, err)
 		}
 	}
 }

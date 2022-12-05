@@ -1,13 +1,51 @@
 package logger
 
 import (
+	"context"
 	"github.com/995933447/log-go"
 	"github.com/995933447/log-go/impls/loggerwriters"
 	"sync"
 )
 
+type Level int
+
+const (
+	LevelDebug Level = iota
+	LevelInfo
+	LevelWarn
+	LevelError
+	LevelPanic
+	LevelFatal
+)
+
+type Logger interface {
+	Debug(ctx context.Context, content interface{})
+
+	Info(ctx context.Context, content interface{})
+
+	Warn(ctx context.Context, content interface{})
+
+	Error(ctx context.Context, content interface{})
+
+	Fatal(ctx context.Context, content interface{})
+
+	Panic(ctx context.Context, content interface{})
+
+	Debugf(ctx context.Context, format string, args ...interface{})
+
+	Infof(ctx context.Context, format string, args ...interface{})
+
+	Warnf(ctx context.Context, format string, args ...interface{})
+
+	Errorf(ctx context.Context, format string, args ...interface{})
+
+	Fatalf(ctx context.Context, format string, args ...interface{})
+
+	Panicf(ctx context.Context, format string, args ...interface{})
+}
+
 type Conf struct{
-	MainProcLogDir string `json:"main_proc_log_dir"`
+	SysProcLogDir string `json:"sys_proc_log_dir"`
 	TaskProcLogDir string `json:"task_proc_log_dir"`
 	FileSize int64 `json:"file_size"`
 }
@@ -23,46 +61,46 @@ func hasInit() bool {
 }
 
 var (
-	mainProcLogger *log.Logger
-	newMainProcLoggerMu sync.Mutex
+	sysProcLogger Logger
+	newSysProcLoggerMu sync.Mutex
 
-	taskProcLogger *log.Logger
-	newTaskProcLoggerMu sync.Mutex
+	sessionProcLogger Logger
+	newSessionProcLoggerMu sync.Mutex
 )
 
-func MustGetMainProcLogger() *log.Logger {
+func MustGetSysProcLogger() Logger {
 	if !hasInit() {
 		panic(any("init not finish"))
 	}
-	if mainProcLogger != nil {
-		return mainProcLogger
+	if sysProcLogger != nil {
+		return sysProcLogger
 	}
-	newMainProcLoggerMu.Lock()
-	defer newMainProcLoggerMu.Unlock()
-	if mainProcLogger != nil {
-		return mainProcLogger
+	newSysProcLoggerMu.Lock()
+	defer newSessionProcLoggerMu.Unlock()
+	if sysProcLogger != nil {
+		return sysProcLogger
 	}
-	mainProcLogger = NewLogger(conf.MainProcLogDir, conf.FileSize)
-	return mainProcLogger
+	sysProcLogger = NewLogger(conf.SysProcLogDir, conf.FileSize)
+	return sysProcLogger
 }
 
-func MustGetTaskProcLogger() *log.Logger {
+func MustGetSessProcLogger() Logger {
 	if !hasInit() {
 		panic(any("init not finish"))
 	}
-	if taskProcLogger != nil {
-		return taskProcLogger
+	if sessionProcLogger != nil {
+		return sessionProcLogger
 	}
-	newTaskProcLoggerMu.Lock()
-	defer newTaskProcLoggerMu.Unlock()
-	if taskProcLogger != nil {
-		return taskProcLogger
+	newSessionProcLoggerMu.Lock()
+	defer newSessionProcLoggerMu.Unlock()
+	if sessionProcLogger != nil {
+		return sessionProcLogger
 	}
-	taskProcLogger = NewLogger(conf.TaskProcLogDir, conf.FileSize)
-	return taskProcLogger
+	sessionProcLogger = NewLogger(conf.TaskProcLogDir, conf.FileSize)
+	return sessionProcLogger
 }
 
-func NewLogger(baseDir string, maxFileSize int64) *log.Logger {
+func NewLogger(baseDir string, maxFileSize int64) Logger {
 	writer := loggerwriters.NewFileLoggerWriter(baseDir, maxFileSize, 5, loggerwriters.OpenNewFileByByDateHour, 100000)
 	go func() {
 		err := writer.Loop()

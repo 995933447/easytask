@@ -9,9 +9,10 @@ import (
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
-	"github.com/995933447/log-go"
+	"github.com/go-playground/validator"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -26,6 +27,7 @@ var _ callbacksrvexec.TaskCallbackSrvExec = (*HttpExec)(nil)
 
 func (e *HttpExec) CallbackSrv(ctx context.Context, task *task.Task, _ any) (*callbacksrvexec.TaskCallbackSrvResp, error) {
 	var (
+		log = logger.MustGetSysProcLogger()
 		httpReq = &httpproto.TaskCallbackReq{
 			Cmd: httpproto.HttpCallbackCmdTaskCallback,
 			Arg:      task.GetArg(),
@@ -37,7 +39,7 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, task *task.Task, _ any) (*ca
 
 	httpReqBytes, err := json.Marshal(httpReq)
 	if err != nil {
-		logger.MustGetTaskProcLogger().Error(ctx, err)
+		log.Error(ctx, err)
 		return nil, err
 	}
 
@@ -50,8 +52,16 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, task *task.Task, _ any) (*ca
 	} else {
 		timeoutSec = route.GetCallbackTimeoutSec()
 	}
-	if err := e.doReq(ctx, logger.MustGetTaskProcLogger(), route, timeoutSec, httpReqBytes, httpResp); err  != nil {
-		logger.MustGetTaskProcLogger().Error(ctx, err)
+	err = e.doReq(ctx, &doReqInput{
+		Log: log,
+		Path: task.GetCallbackPath(),
+		Route: route,
+		TimeoutSec: timeoutSec,
+		ReqBytes: httpReqBytes,
+		Resp: httpResp,
+	})
+	if err != nil {
+		log.Error(ctx, err)
 		return nil, err
 	}
 
@@ -60,6 +70,7 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, task *task.Task, _ any) (*ca
 
 func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*callbacksrvexec.HeartBeatResp, error) {
 	var (
+		log = logger.MustGetSysProcLogger()
 		httpReq = &httpproto.HeartBeatReq{
 			Cmd: httpproto.HttpCallbackCmdTaskHeartBeat,
 		}
@@ -68,7 +79,7 @@ func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*c
 
 	httpReqBytes, err := json.Marshal(httpReq)
 	if err != nil {
-		logger.MustGetMainProcLogger().Error(ctx, err)
+		log.Error(ctx, err)
 		return nil, err
 	}
 
@@ -81,12 +92,22 @@ func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*c
 		wg.Add(1)
 		go func(route *task.TaskCallbackSrvRoute) {
 			defer wg.Done()
-			if err := e.doReq(ctx, logger.MustGetMainProcLogger(), route, route.GetCallbackTimeoutSec(), httpReqBytes, httpResp); err != nil {
+
+			err = e.doReq(ctx, &doReqInput{
+				Log: log,
+				Route: route,
+				TimeoutSec: route.GetCallbackTimeoutSec(),
+				ReqBytes: httpReqBytes,
+				Resp: httpResp,
+			})
+			if err != nil {
+				log.Error(ctx, err)
 				noReplyRoutes = append(noReplyRoutes, route)
 				return
 			}
 
 			if !httpResp.Pong {
+				log.Warnf(ctx, "route(id:%s) heart beat resp.Pong is false", route.GetId())
 				noReplyRoutes = append(noReplyRoutes, route)
 				return
 			}
@@ -99,38 +120,62 @@ func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*c
 	return callbacksrvexec.NewHeartBeatResp(replyRoutes, noReplyRoutes), nil
 }
 
-func (e *HttpExec) doReq(ctx context.Context, logger *log.Logger, route *task.TaskCallbackSrvRoute, timeoutSec int, reqBytes []byte, resp interface{}) error {
+type doReqInput struct {
+	Log logger.Logger `validate:"required"`
+	Path string
+	Route *task.TaskCallbackSrvRoute `validate:"required"`
+	TimeoutSec int
+	ReqBytes []byte `validate:"required"`
+	Resp interface{} `validate:"required"`
+}
+
+func (i *doReqInput) Check() error {
+	if err := validator.New().Struct(i); err != nil {
+		return err
+	}
+	i.Path = strings.TrimSpace(i.Path)
+	if i.Path != "" {
+		i.Path += "/"
+	}
+	return nil
+}
+
+func (e *HttpExec) doReq(ctx context.Context, input *doReqInput) error {
+	if err := input.Check(); err != nil {
+		return err
+	}
+
 	httpReq, err := http.NewRequest(
 		http.MethodPost,
-		fmt.Sprintf("%s://%s:%d", route.GetSchema(), route.GetHost(), route.GetPort()),
-		bytes.NewBuffer(reqBytes),
+		fmt.Sprintf("%s://%s:%d%s", input.Route.GetSchema(), input.Route.GetHost(), input.Route.GetPort(), input.Path),
+		bytes.NewBuffer(input.ReqBytes),
 	)
 	if err != nil {
-		logger.Error(ctx, err)
+		input.Log.Error(ctx, err)
 		return err
 	}
 
 	httpCli := http.Client{}
 
-	if timeoutSec > 0 {
-		httpCli.Timeout = time.Duration(timeoutSec) * time.Second
+	if input.TimeoutSec > 0 {
+		httpCli.Timeout = time.Duration(input.TimeoutSec) * time.Second
 	}
 
 	httpResp, err := httpCli.Do(httpReq)
 	if err != nil {
-		logger.Error(ctx, err)
+		input.Log.Error(ctx, err)
 		return err
 	}
 
 	httpRespBody, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		logger.Error(ctx, err)
+		input.Log.Error(ctx, err)
 		return err
 	}
 
-	err = json.Unmarshal(httpRespBody, &resp)
+	err = json.Unmarshal(httpRespBody, &input.Resp)
 	if err != nil {
-		logger.Error(ctx, err)
+		input.Log.Error(ctx, err)
 		return err
 	}
 

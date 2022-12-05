@@ -5,7 +5,7 @@ import (
 	"github.com/995933447/easytask/internal/callbacksrvexec"
 	"github.com/995933447/easytask/internal/sched"
 	"github.com/995933447/easytask/internal/util/logger"
-	"github.com/995933447/easytask/pkg/cntx"
+	"github.com/995933447/easytask/pkg/contx"
 	"time"
 )
 
@@ -32,11 +32,11 @@ func NewWorkerEngine(workerPoolSize uint, sched *sched.Sched, callbackTaskSrvExe
 }
 
 func (e *workerEngine) Run(ctx context.Context) {
-	e.createWorkerPool(ctx)
+	e.createWorkerPool()
 	e.sched.Run(ctx)
 }
 
-func (e *workerEngine) createWorkerPool(ctx context.Context) {
+func (e *workerEngine) createWorkerPool() {
 	var i uint
 	for ; i < e.workerPoolSize; i++ {
 		taskIn := make(chan *Task)
@@ -48,18 +48,20 @@ func (e *workerEngine) runWorker(taskIn chan *Task) {
 	for {
 		e.sched.TaskWorkerReady(taskIn)
 		task := <-taskIn
-		ctx := cntx.New("task")
+		ctx := contx.New("task", context.TODO())
+		log := logger.MustGetSysProcLogger()
 		locked, err := e.sched.LockTaskForRun(ctx, task)
 		if err != nil {
-			logger.MustGetTaskProcLogger().Error(ctx, err)
+			log.Error(ctx, err)
 			return
 		}
 		if !locked {
+			log.Warnf(ctx, "lock task(id:%s) failed", task.id)
 			return
 		}
 		taskResp, err := task.run(ctx, e.callbackTaskSrvExec)
 		if err != nil {
-			logger.MustGetTaskProcLogger().Error(ctx, err)
+			log.Error(ctx, err)
 			taskResp = newInternalErrTaskResp(task.id, err, time.Now().Unix())
 		}
 		e.sched.SubmitTaskResp(taskResp)

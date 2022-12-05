@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"context"
+	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/optionstream"
 	"gorm.io/gorm"
 )
@@ -17,9 +18,11 @@ func NewOptStreamQuery(db *gorm.DB) *OptStreamQuery {
 }
 
 func (q *OptStreamQuery) Hit(ctx context.Context, limit, offset int64, list interface{}) (int64, error) {
+	log := logger.MustGetSysProcLogger()
 	db := q.db.WithContext(ctx)
 	var count int64
 	if err := db.Count(&count).Error; err != nil {
+		log.Error(ctx, err)
 		return 0, err
 	}
 	if limit > 0 {
@@ -29,6 +32,7 @@ func (q *OptStreamQuery) Hit(ctx context.Context, limit, offset int64, list inte
 		db.Limit(int(offset))
 	}
 	if err := db.Scan(list).Error; err != nil {
+		log.Error(ctx, err)
 		return 0, err
 	}
 	return count, nil
@@ -43,6 +47,7 @@ func (q *OptStreamQuery) Query(ctx context.Context, limit, offset int64, list in
 		db.Limit(int(offset))
 	}
 	if err := db.Scan(list).Error; err != nil {
+		logger.MustGetSysProcLogger().Error(ctx, err)
 		return err
 	}
 	return nil
