@@ -115,6 +115,7 @@ func recoverPanic(ctx context.Context) {
 			}
 		}
 		logger.MustGetSysLogger().Errorf(ctx, "stack is empty (%s)", err)
+		os.Exit(0)
 	}
 }
 
