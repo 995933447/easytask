@@ -105,7 +105,7 @@ func (r *Router) Register(ctx context.Context, route *Route) error {
 		handler: reflect.ValueOf(route.Handler),
 		req: reqType,
 	}
-	r.routeMap[route.Method] = methodToHandlerMap
+	r.routeMap[route.Path] = methodToHandlerMap
 
 	return nil
 }
