@@ -243,7 +243,7 @@ func runTaskWorker(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, elec
 
 func runApiServer(ctx context.Context, conf *Conf) error {
 	router := apihandler.NewRouter(conf.ApiServerConf.Host, conf.ApiServerConf.Port)
-	if err := router.Register(ctx, "task", http.MethodPost, apihandler.AddTask); err != nil {
+	if err := router.RegisterBatch(ctx, apiRoutes); err != nil {
 		logger.MustGetSysProcLogger().Error(ctx, err)
 		return err
 	}

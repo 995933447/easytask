@@ -10,6 +10,7 @@ import (
 	"github.com/995933447/easytask/pkg/errs"
 	internalerr "github.com/995933447/easytask/internal/util/errs"
 	"github.com/ggicci/httpin"
+	"github.com/go-playground/validator"
 	"net/http"
 	"reflect"
 	"sync"
@@ -22,6 +23,15 @@ type handlerReflect struct {
 	resp reflect.Type
 }
 
+type Route struct {
+	Path, Method string `validate:"required"`
+	Handler any `validate:"required"`
+}
+
+func (r *Route) Check() error {
+	return validator.New().Struct(r)
+}
+
 type Router struct {
 	host string
 	port int
@@ -30,13 +40,28 @@ type Router struct {
 	isBooted atomic.Bool
 }
 
-func (r *Router) Register(ctx context.Context, path, method string, handler any) error {
+func (r *Router) RegisterBatch(ctx context.Context, routes []*Route) error {
+	for _, route := range routes {
+		if err := r.Register(ctx, route); err != nil {
+			logger.MustGetSysProcLogger().Error(ctx, err)
+		}
+	}
+	return nil
+}
+
+func (r *Router) Register(ctx context.Context, route *Route) error {
 	if r.isBooted.Load() {
 		return internalerr.ErrServerStarted
 	}
 
-	handlerType := reflect.TypeOf(handler)
 	log := logger.MustGetSysProcLogger()
+
+	if err := route.Check(); err != nil {
+		log.Error(ctx, err)
+		return err
+	}
+
+	handlerType := reflect.TypeOf(route.Handler)
 	errInvalidHandler := errors.New("handler must be implements func(api.*Context, req)) (resp, error)")
 
 	if handlerType.NumIn() != 2 || handlerType.NumOut() != 2 {
@@ -72,16 +97,16 @@ func (r *Router) Register(ctx context.Context, path, method string, handler any)
 
 	r.routeMu.Lock()
 	defer r.routeMu.Unlock()
-	methodToHandlerMap, ok := r.routeMap[path]
+	methodToHandlerMap, ok := r.routeMap[route.Path]
 	if !ok {
 		methodToHandlerMap = make(map[string]*handlerReflect)
 	}
-	methodToHandlerMap[method] = &handlerReflect{
-		handler: reflect.ValueOf(handler),
+	methodToHandlerMap[route.Method] = &handlerReflect{
+		handler: reflect.ValueOf(route.Handler),
 		req: reqType,
 		resp: respType,
 	}
-	r.routeMap[path] = methodToHandlerMap
+	r.routeMap[route.Method] = methodToHandlerMap
 
 	return nil
 }
