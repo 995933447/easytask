@@ -44,6 +44,7 @@ func (r *Router) RegisterBatch(ctx context.Context, routes []*Route) error {
 	for _, route := range routes {
 		if err := r.Register(ctx, route); err != nil {
 			logger.MustGetSysLogger().Error(ctx, err)
+			return err
 		}
 	}
 	return nil
