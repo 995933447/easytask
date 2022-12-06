@@ -254,7 +254,7 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 	}
 
 	var srvModels []*TaskCallbackSrvModel
-	err = conn.Scan(&srvModels).Error
+	err = NewOptStreamQuery(conn).Query(ctx, queryStream.Limit, queryStream.Offset, srvModels)
 	if err != nil {
 		log.Error(ctx, err)
 		return nil, err
