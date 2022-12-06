@@ -9,15 +9,6 @@ import (
 
 type Level int
 
-const (
-	LevelDebug Level = iota
-	LevelInfo
-	LevelWarn
-	LevelError
-	LevelPanic
-	LevelFatal
-)
-
 type Logger interface {
 	Debug(ctx context.Context, content interface{})
 
