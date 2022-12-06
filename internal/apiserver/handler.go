@@ -9,7 +9,7 @@ import (
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
 )
 
-func AddTaskHandler(taskRepo repo.TaskRepo, reg registry.Registry) func(ctx context.Context, req *httpproto.AddTaskReq) (*httpproto.AddTaskResp, error) {
+func AddTaskHandler(taskRepo repo.TaskRepo, reg *registry.Registry) func(ctx context.Context, req *httpproto.AddTaskReq) (*httpproto.AddTaskResp, error) {
 	return func(ctx context.Context, req *httpproto.AddTaskReq) (*httpproto.AddTaskResp, error) {
 		log := logger.MustGetSessLogger()
 
@@ -49,7 +49,7 @@ func DelTaskHandler(taskRepo repo.TaskRepo) func(ctx context.Context, req *httpp
 	}
 }
 
-func RegisterTaskCallbackSrvHandler(reg registry.Registry) func(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq) (*httpproto.RegisterTaskCallbackSrvResp, error) {
+func RegisterTaskCallbackSrvHandler(reg *registry.Registry) func(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq) (*httpproto.RegisterTaskCallbackSrvResp, error) {
 	return func(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq) (*httpproto.RegisterTaskCallbackSrvResp, error) {
 		routes := []*task.TaskCallbackSrvRoute{
 			task.NewTaskCallbackSrvRoute("", req.Schema, req.Host, req.Port, req.CallbackTimeoutSec, req.IsEnableHealthCheck),
@@ -63,7 +63,7 @@ func RegisterTaskCallbackSrvHandler(reg registry.Registry) func(ctx context.Cont
 	}
 }
 
-func UnregisterTaskCallbackSrvHandler(reg registry.Registry) func(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
+func UnregisterTaskCallbackSrvHandler(reg *registry.Registry) func(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
 	return func(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
 		routes := []*task.TaskCallbackSrvRoute{
 			task.NewTaskCallbackSrvRoute("", req.Schema, req.Host, req.Port, 0, false),

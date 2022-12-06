@@ -96,7 +96,7 @@ func main() {
 		panic(any(err))
 	}
 
-	runRegistry(ctx, conf, taskCallbackSrvRepo, elect)
+	reg := runRegistry(ctx, conf, taskCallbackSrvRepo, elect)
 
 	runTaskWorker(ctx, conf, taskRepo, elect)
 
@@ -110,7 +110,7 @@ func main() {
 	}()
 	signal.Notify(signCh, syscall.SIGINT, syscall.SIGTERM)
 
-	if err = runApiServer(ctx, conf, taskRepo, taskCallbackSrvRepo); err != nil {
+	if err = runApiServer(ctx, conf, taskRepo, reg); err != nil {
 		panic(any(err))
 	}
 }
@@ -204,7 +204,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, chan e
 	return nil, errDuringLoopCh, nil
 }
 
-func runRegistry(ctx context.Context, conf *Conf, taskCallbackSrvRepo repo.TaskCallbackSrvRepo, elect autoelect.AutoElection) {
+func runRegistry(ctx context.Context, conf *Conf, taskCallbackSrvRepo repo.TaskCallbackSrvRepo, elect autoelect.AutoElection) *registry.Registry {
 	reg := registry.NewRegistry(
 		conf.IsClusterMode,
 		conf.HealthCheckWorkerPoolSize,
@@ -213,6 +213,7 @@ func runRegistry(ctx context.Context, conf *Conf, taskCallbackSrvRepo repo.TaskC
 		elect,
 		)
 	go reg.Run(ctx)
+	return reg
 }
 
 func NewRepos(ctx context.Context, conf *Conf) (repo.TaskRepo, repo.TaskCallbackSrvRepo, error) {
@@ -241,7 +242,7 @@ func runTaskWorker(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, elec
 	go engine.Run(ctx)
 }
 
-func runApiServer(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, reg registry.Registry) error {
+func runApiServer(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, reg *registry.Registry) error {
 	router := apiserver.NewRouter(conf.ApiServerConf.Host, conf.ApiServerConf.Port)
 	if err := router.RegisterBatch(ctx, getApiRoutes(taskRepo, reg)); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
