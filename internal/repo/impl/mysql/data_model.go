@@ -54,7 +54,7 @@ type TaskModel struct {
 }
 
 func (t *TaskModel) toEntity(callbackSrv *task.TaskCallbackSrv) (*task.Task, error) {
-	entitySchedMode, err := t.toSchedMode()
+	entitySchedMode, err := t.toEntitySchedMode()
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +73,28 @@ func (t *TaskModel) toEntity(callbackSrv *task.TaskCallbackSrv) (*task.Task, err
 	})
 }
 
-func (t *TaskModel) toSchedMode() (task.SchedMode, error) {
-	switch t.SchedMode {
+func (t *TaskModel) toEntitySchedMode() (task.SchedMode, error) {
+	return toTaskEntitySchedMode(t.SchedMode)
+}
+
+func (t *TaskModel) toEntityId() string {
+	return toTaskEntityId(t.Id)
+}
+
+func toTaskModelSchedMode(entitySchedMode task.SchedMode) (int, error) {
+	switch entitySchedMode {
+	case task.SchedModeTimeCron:
+		return schedModeTimeCron, nil
+	case task.SchedModeTimeSpec:
+		return schedModeTimeSpec, nil
+	case task.SchedModeTimeInterval:
+		return schedModeTimeInterval, nil
+	}
+	return schedModeNil, errors.New("invalid schedule mode")
+}
+
+func toTaskEntitySchedMode(schedMode int) (task.SchedMode, error) {
+	switch schedMode {
 	case schedModeTimeCron:
 		return task.SchedModeTimeCron, nil
 	case schedModeTimeSpec:
@@ -83,22 +103,6 @@ func (t *TaskModel) toSchedMode() (task.SchedMode, error) {
 		return task.SchedModeTimeInterval, nil
 	}
 	return task.SchedModeNil, errors.New("invalid schedule mode")
-}
-
-func (t *TaskModel) toEntityId() string {
-	return toTaskEntityId(t.Id)
-}
-
-func toTaskEntitySchedMode(schedMode task.SchedMode) (int, error) {
-	switch schedMode {
-	case schedModeTimeCron:
-		return schedModeTimeCron, nil
-	case schedModeTimeSpec:
-		return schedModeTimeSpec, nil
-	case schedModeTimeInterval:
-		return schedModeTimeInterval, nil
-	}
-	return schedModeNil, errors.New("invalid schedule mode")
 }
 
 func toTaskEntityId(modelId uint64) string {

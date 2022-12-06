@@ -55,7 +55,7 @@ func (r *TaskRepo) GetTaskById(ctx context.Context, id string) (*task.Task, erro
 
 	srv := srvs[0]
 
-	schedMode, err := taskModel.toSchedMode()
+	schedMode, err := taskModel.toEntitySchedMode()
 	if err != nil {
 		log.Error(ctx, err)
 		return nil, err
@@ -98,7 +98,7 @@ func (r *TaskRepo) AddTask(ctx context.Context, oneTask *task.Task) (string, err
 		return "", err
 	}
 
-	schedModel, err := toTaskEntitySchedMode(oneTask.GetSchedMode())
+	schedModel, err := toTaskModelSchedMode(oneTask.GetSchedMode())
 	if err != nil {
 		log.Error(ctx, err)
 		return "", err
@@ -174,7 +174,7 @@ func (r *TaskRepo) TimeoutTasks(ctx context.Context, size int) ([]*task.Task, er
 		if !ok {
 			continue
 		}
-		schedMode, err := taskModel.toSchedMode()
+		schedMode, err := taskModel.toEntitySchedMode()
 		if err != nil {
 			log.Error(ctx, err)
 			return nil, err
