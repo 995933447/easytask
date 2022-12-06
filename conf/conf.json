@@ -1,3 +1,26 @@
 {
-
+  "is_cluster_mode": false,
+  "cluster_name": "easy_task",
+  "task_worker_pool_size": 300,
+  "elect_driver": "etcd",
+  "mysql": {
+      "dsn":"user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
+  },
+  "etcd": {
+      "endpoints": ["127.0.0.1:2379"]
+  },
+  "redis": {
+      "nodes": [
+          {"host":"127.0.0.1", "port": 6379}
+      ]
+  },
+  "health_check_worker_pool_size": 100,
+  "log": {
+      "sys_proc_log_dir":"/var/log/easytask/sys/",
+      "session_proc_log_dir": "/var/log/easytask/access/"
+  },
+  "api_server": {
+      "host": "0.0.0.0",
+      "port": 8801
+  }
 }

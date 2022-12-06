@@ -36,7 +36,6 @@ type Logger interface {
 type Conf struct{
 	SysProcLogDir string `json:"sys_proc_log_dir"`
 	SessionProcLogDir string `json:"session_proc_log_dir"`
-	TaskProcLogDir string `json:"task_proc_log_dir"`
 	FileSize int64 `json:"file_size"`
 }
 
