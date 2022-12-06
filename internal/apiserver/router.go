@@ -124,7 +124,7 @@ func (r *Router) Boot(ctx context.Context) error {
 	}()
 
 	respErr := func(ctx context.Context, writer http.ResponseWriter, errCode errs.ErrCode) {
-		if err := r.writeResp(ctx, writer, int(errCode), []byte(errs.GetErrMsg(errCode)), nil); err != nil {
+		if err := r.writeResp(ctx, writer, 200, []byte(errs.GetErrMsg(errCode)), nil); err != nil {
 			logger.MustGetSessLogger().Error(ctx, err)
 		}
 	}
