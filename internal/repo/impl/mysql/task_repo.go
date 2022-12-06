@@ -6,8 +6,8 @@ import (
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/reflectutil"
-	"github.com/gorhill/cronexpr"
 	"gorm.io/gorm"
+	"math"
 	"sync/atomic"
 	"time"
 )
@@ -18,6 +18,125 @@ type TaskRepo struct {
 	srvRepo repo.TaskCallbackSrvRepo
 	repoConnector
 	defaultTaskMaxRunTimeSec int64
+}
+
+func (r *TaskRepo) DelTaskById(ctx context.Context, id string) error {
+	log := logger.MustGetSysLogger()
+	modelId, err := toTaskModelId(id)
+	if err != nil {
+		log.Error(ctx, err)
+		return err
+	}
+	if err = r.mustGetConn(ctx).Delete(&TaskModel{}, modelId).Error; err != nil {
+		log.Error(ctx, err)
+		return err
+	}
+	return nil
+}
+
+func (r *TaskRepo) GetTaskById(ctx context.Context, id string) (*task.Task, error) {
+	log := logger.MustGetSysLogger()
+	var taskModel TaskModel
+	if err := r.mustGetConn(ctx).Where(DbFieldId, toTaskModelId(id)).Take(&taskModel).Error; err != nil {
+		log.Error(ctx, err)
+		return nil, err
+	}
+
+	srvId := toTaskCallbackSrvEntityId(taskModel.CallbackSrvId)
+	srvs, err := r.srvRepo.GetSrvsByIds(ctx, []string{srvId})
+	if err != nil {
+		log.Error(ctx, err)
+		return nil, err
+	}
+	if len(srvs) == 0 {
+		log.Warnf(ctx, "get TaskCallbackSrv(id:%s) is empty", srvId)
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	srv := srvs[0]
+
+	schedMode, err := taskModel.toSchedMode()
+	if err != nil {
+		log.Error(ctx, err)
+		return nil, err
+	}
+
+	var timeSpecAt int64
+	if taskModel.SchedMode == schedModeTimeSpec {
+		timeSpecAt = taskModel.PlanSchedNextAt
+	}
+
+	oneTask, err := task.NewTask(&task.NewTaskReq{
+		Id: taskModel.toEntityId(),
+		CallbackSrv: srv,
+		CallbackPath: taskModel.CallbackPath,
+		Name: taskModel.Name,
+		Arg: taskModel.Arg,
+		RunTimes: taskModel.RunTimes,
+		LastRunAt: taskModel.LastRunAt,
+		AllowMaxRunTimes: taskModel.AllowMaxRunTimes,
+		SchedMode: schedMode,
+		TimeCronExpr: taskModel.TimeCronExpr,
+		TimeIntervalSec: taskModel.TimeIntervalSec,
+		TimeSpecAt: timeSpecAt,
+	})
+	if err != nil {
+		log.Error(ctx, err)
+		return nil, err
+	}
+
+	return oneTask, nil
+}
+
+func (r *TaskRepo) AddTask(ctx context.Context, oneTask *task.Task) (string, error) {
+	log := logger.MustGetSysLogger()
+	conn := r.mustGetConn(ctx)
+
+	srvId, err := toCallbackSrvRouteModelId(oneTask.GetCallbackSrv().GetId())
+	if err != nil {
+		log.Error(ctx, err)
+		return "", err
+	}
+
+	schedModel, err := toTaskEntitySchedMode(oneTask.GetSchedMode())
+	if err != nil {
+		log.Error(ctx, err)
+		return "", err
+	}
+
+	schedNextAt, err := oneTask.GetSchedNextAt()
+	if err != nil {
+		log.Error(ctx, err)
+		return "", nil
+	}
+
+	var allowMaxRunTimes int
+	switch oneTask.GetSchedMode() {
+	case task.SchedModeTimeSpec:
+		allowMaxRunTimes = 1
+	case task.SchedModeTimeCron, task.SchedModeTimeInterval:
+		allowMaxRunTimes = math.MaxInt
+	}
+
+	taskModel := &TaskModel{
+		Name: oneTask.GetName(),
+		Arg: oneTask.GetArg(),
+		Status: statusReady,
+		SchedMode: schedModel,
+		TimeCronExpr: oneTask.GetTimeCronExpr(),
+		TimeIntervalSec: oneTask.GetTimeIntervalSec(),
+		PlanSchedNextAt: schedNextAt,
+		AllowMaxRunTimes: allowMaxRunTimes,
+		CallbackPath: oneTask.GetCallbackPath(),
+		CallbackSrvId: srvId,
+	}
+	err = conn.Create(taskModel).Error
+	if err != nil {
+		log.Error(ctx, err)
+		return "", nil
+	}
+
+	return taskModel.toEntityId(), nil
 }
 
 func (r *TaskRepo) TimeoutTasks(ctx context.Context, size int) ([]*task.Task, error) {
@@ -47,7 +166,7 @@ func (r *TaskRepo) TimeoutTasks(ctx context.Context, size int) ([]*task.Task, er
 		return nil, err
 	}
 
-	callbackSrvMap := reflectutil.MapByKey(callbackSrvs, FieldId).(map[uint64]*task.Task)
+	callbackSrvMap := reflectutil.MapByKey(callbackSrvs, FieldId).(map[uint64]*task.TaskCallbackSrv)
 
 	var tasks []*task.Task
 	for _, taskModel := range taskModels {
@@ -55,7 +174,34 @@ func (r *TaskRepo) TimeoutTasks(ctx context.Context, size int) ([]*task.Task, er
 		if !ok {
 			continue
 		}
-		tasks = append(tasks, callbackSrv)
+		schedMode, err := taskModel.toSchedMode()
+		if err != nil {
+			log.Error(ctx, err)
+			return nil, err
+		}
+		var timeSpecAt int64
+		if taskModel.SchedMode == schedModeTimeSpec {
+			timeSpecAt = taskModel.PlanSchedNextAt
+		}
+		oneTask, err := task.NewTask(&task.NewTaskReq{
+			Id: taskModel.toEntityId(),
+			CallbackSrv: callbackSrv,
+			CallbackPath: taskModel.CallbackPath,
+			Name: taskModel.Name,
+			Arg: taskModel.Arg,
+			RunTimes: taskModel.RunTimes,
+			LastRunAt: taskModel.LastRunAt,
+			AllowMaxRunTimes: taskModel.AllowMaxRunTimes,
+			SchedMode: schedMode,
+			TimeSpecAt: timeSpecAt,
+			TimeIntervalSec: taskModel.TimeIntervalSec,
+			TimeCronExpr: taskModel.TimeCronExpr,
+		})
+		if err != nil {
+			log.Error(ctx, err)
+			return nil, err
+		}
+		tasks = append(tasks, oneTask)
 	}
 
 	return nil, nil
@@ -65,21 +211,17 @@ func (r *TaskRepo) LockTask(ctx context.Context, oneTask *task.Task) (bool, erro
 	var (
 		log = logger.MustGetSysLogger()
 		now = time.Now().Unix()
-		taskModelUpdates = map[string]interface{}{
-			DbFieldLastRunAt: now,
-			DbFieldRunTimes: gorm.Expr(DbFieldRunTimes + " + 1"),
-		}
 	)
-	switch oneTask.GetSchedMode() {
-	case task.SchedModeTimeInterval:
-		taskModelUpdates[DbFieldPlanSchedNextAt] = now + int64(oneTask.GetTimeIntervalSec())
-	case task.SchedModeTimeCron:
-		expr, err := cronexpr.Parse(oneTask.GetTimeCronExpr())
-		if err != nil {
-			log.Error(ctx, err)
-			return false, err
-		}
-		taskModelUpdates[DbFieldPlanSchedNextAt] = expr.Next(time.Now()).Unix()
+
+	schedNextAt, err := oneTask.GetSchedNextAt()
+	if err != nil {
+		return false, err
+	}
+
+	taskModelUpdates := map[string]interface{}{
+		DbFieldLastRunAt: now,
+		DbFieldRunTimes: gorm.Expr(DbFieldRunTimes + " + 1"),
+		DbFieldPlanSchedNextAt: schedNextAt,
 	}
 
 	taskModelId, err := toTaskModelId(oneTask.GetId())

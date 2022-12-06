@@ -1,4 +1,4 @@
-package apihandler
+package apiserver
 
 import (
 	"context"
@@ -161,7 +161,11 @@ func (r *Router) Boot(ctx context.Context) error {
 			respJson, err := json.Marshal(resp)
 			if err != nil {
 				logger.MustGetSessLogger().Error(ctx, err)
-				respErr(ctx, writer, errs.ErrCodeInternal)
+				if handleErr, ok := err.(*HandleErr); ok {
+					respErr(ctx, writer, handleErr.errCode)
+				} else {
+					respErr(ctx, writer, errs.ErrCodeInternal)
+				}
 				return
 			}
 

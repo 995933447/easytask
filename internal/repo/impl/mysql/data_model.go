@@ -50,6 +50,7 @@ type TaskModel struct {
 	LastSuccessAt int64
 	AllowMaxRunTimes int
 	MaxRunTimeSec int
+	CallbackPath string
 }
 
 func (t *TaskModel) toEntity(callbackSrv *task.TaskCallbackSrv) (*task.Task, error) {
@@ -81,11 +82,23 @@ func (t *TaskModel) toSchedMode() (task.SchedMode, error) {
 	case schedModeTimeInterval:
 		return task.SchedModeTimeInterval, nil
 	}
-	return schedModeNil, errors.New("invalid schedule mode")
+	return task.SchedModeNil, errors.New("invalid schedule mode")
 }
 
 func (t *TaskModel) toEntityId() string {
 	return toTaskEntityId(t.Id)
+}
+
+func toTaskEntitySchedMode(schedMode task.SchedMode) (int, error) {
+	switch schedMode {
+	case schedModeTimeCron:
+		return schedModeTimeCron, nil
+	case schedModeTimeSpec:
+		return schedModeTimeSpec, nil
+	case schedModeTimeInterval:
+		return schedModeTimeInterval, nil
+	}
+	return schedModeNil, errors.New("invalid schedule mode")
 }
 
 func toTaskEntityId(modelId uint64) string {
@@ -104,7 +117,19 @@ type TaskCallbackSrvModel struct {
 }
 
 func (m *TaskCallbackSrvModel) toEntity(routes []*task.TaskCallbackSrvRoute) *task.TaskCallbackSrv {
-	return task.NewTaskCallbackSrv(m.Name, routes, m.HasEnableHealthCheck)
+	return task.NewTaskCallbackSrv(m.toEntityId(), m.Name, routes, m.HasEnableHealthCheck)
+}
+
+func (m *TaskCallbackSrvModel) toEntityId() string {
+	return toTaskCallbackSrvEntityId(m.Id)
+}
+
+func toTaskCallbackSrvEntityId(modelId uint64) string {
+	return fmt.Sprintf("%d", modelId)
+}
+
+func toTaskCallbackSrvModelId(entity *task.TaskCallbackSrv) (uint64, error) {
+	return strconv.ParseUint(entity.GetId(), 10, 64)
 }
 
 type TaskCallbackSrvRouteModel struct {

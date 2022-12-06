@@ -1,14 +1,30 @@
 package httpproto
 
-type AddTaskReq struct {
+import "github.com/995933447/easytask/internal/task"
 
+type AddTaskReq struct {
+	Name string `json:"name"`
+	SrvName string 	`json:"srv_name"`
+	CallbackPath string `json:"callback_path"`
+	SchedMode task.SchedMode `json:"sched_mode"`
+	TimeCron string `json:"time_cron"`
+	TimeIntervalSec string `json:"time_interval_sec"`
+	TimeSpec string `json:"time_spec"`
+	Arg []byte `json:"arg"`
 }
 
 type AddTaskResp struct {
-
+	Id string `json:"id"`
 }
 
-type AddTaskCallbackSrvReq struct {
+type DelTaskReq struct {
+	Id string `json:"id"`
+}
+
+type DelTaskResp struct {
+}
+
+type RegisterTaskCallbackSrvReq struct {
 	Name string `json:"name"`
 	Schema string `json:"schema"`
 	Host string `json:"host"`
@@ -17,6 +33,15 @@ type AddTaskCallbackSrvReq struct {
 	IsEnableHealthCheck bool `json:"is_enable_health_check"`
 }
 
-type AddTaskCallbackSrvResp struct {
+type RegisterTaskCallbackSrvResp struct {
+}
 
+type UnregisterTaskCallbackSrvReq struct {
+	Name string `json:"name"`
+	Schema string `json:"schema"`
+	Host string `json:"host"`
+	Port int `json:"port"`
+}
+
+type UnregisterTaskCallbackSrvResp struct {
 }

@@ -173,6 +173,6 @@ func (r *Registry) runWorker(ctx context.Context, withNoReplyRouteSrvCh, withRep
 		logger.MustGetSysLogger().Error(ctx, err)
 		return
 	}
-	withNoReplyRouteSrvCh <- task.NewTaskCallbackSrv(srv.GetName(), heatBeatResp.GetNoReplyRoutes(), true)
-	withReplyRouteSrvCh <- task.NewTaskCallbackSrv(srv.GetName(), heatBeatResp.GetReplyRoutes(), true)
+	withNoReplyRouteSrvCh <- task.NewTaskCallbackSrv(srv.GetId(), srv.GetName(), heatBeatResp.GetNoReplyRoutes(), true)
+	withReplyRouteSrvCh <- task.NewTaskCallbackSrv(srv.GetId(), srv.GetName(), heatBeatResp.GetReplyRoutes(), true)
 }

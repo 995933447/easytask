@@ -11,6 +11,9 @@ type TaskRepo interface {
 	LockTask(context.Context, *task.Task) (bool, error)
 	ConfirmTasks(context.Context, []*task.TaskResp) error
 	ConfirmTask(context.Context, *task.TaskResp) error
+	AddTask(context.Context, *task.Task) (string, error)
+	GetTaskById(context.Context, string) (*task.Task, error)
+	DelTaskById(context.Context, string) error
 }
 
 type TaskCallbackSrvRepo interface {

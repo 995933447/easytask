@@ -4,7 +4,9 @@ import (
 	"context"
 	"github.com/995933447/easytask/internal/callbacksrvexec"
 	"github.com/995933447/easytask/internal/util/logger"
+	"errors"
 	"github.com/go-playground/validator"
+	"github.com/gorhill/cronexpr"
 	"math/rand"
 	"time"
 )
@@ -129,6 +131,7 @@ func NewTaskCallbackSrvRoute(id, schema, host string, port, callbackTimeoutSec i
 }
 
 type TaskCallbackSrv struct {
+	id string
 	name   string
 	routes []*TaskCallbackSrvRoute
 	hasEnableHealthCheck bool
@@ -154,13 +157,18 @@ func (s *TaskCallbackSrv) GetRoutes() []*TaskCallbackSrvRoute {
 	return s.routes
 }
 
+func (s *TaskCallbackSrv) GetId() string {
+	return s.id
+}
+
 func (s *TaskCallbackSrv) GetRandomRoute() *TaskCallbackSrvRoute {
 	rand.Seed(time.Now().UnixNano())
 	return s.routes[rand.Intn(len(s.routes))]
 }
 
-func NewTaskCallbackSrv(name string, routes []*TaskCallbackSrvRoute, hasEnableHealthCheck bool) *TaskCallbackSrv {
+func NewTaskCallbackSrv(id, name string, routes []*TaskCallbackSrvRoute, hasEnableHealthCheck bool) *TaskCallbackSrv {
 	return &TaskCallbackSrv{
+		id: id,
 		name: name,
 		routes: routes,
 		hasEnableHealthCheck: hasEnableHealthCheck,
@@ -180,6 +188,26 @@ type Task struct {
 	schedMode SchedMode
 	timeCronExpr string
 	timeIntervalSec int
+	timeSpecAt int64
+}
+
+var ErrUnknownSchedAt = errors.New("unknown schedule at")
+
+func (t *Task) GetSchedNextAt() (int64, error) {
+	now := time.Now()
+	switch t.GetSchedMode() {
+	case SchedModeTimeInterval:
+		return now.Unix() + int64(t.GetTimeIntervalSec()), nil
+	case SchedModeTimeCron:
+		expr, err := cronexpr.Parse(t.GetTimeCronExpr())
+		if err != nil {
+			return 0, err
+		}
+		return expr.Next(now).Unix(), nil
+	case SchedModeTimeSpec:
+		return t.timeSpecAt, nil
+	}
+	return 0, ErrUnknownSchedAt
 }
 
 func (t *Task) GetTimeIntervalSec() int {
@@ -192,6 +220,10 @@ func (t *Task) GetSchedMode() SchedMode {
 
 func (t *Task) GetTimeCronExpr() string {
 	return t.timeCronExpr
+}
+
+func (t *Task) GetTimeSpecAt() int64 {
+	return t.timeSpecAt
 }
 
 func (t *Task) GetMaxRunTimeSec() int {
@@ -266,6 +298,7 @@ type NewTaskReq struct {
 	SchedMode SchedMode `validate:"required"`
 	TimeCronExpr string
 	TimeIntervalSec int
+	TimeSpecAt int64
 }
 
 func (r *NewTaskReq) Check() error {
@@ -290,6 +323,7 @@ func NewTask(req *NewTaskReq) (*Task, error) {
 		schedMode: req.SchedMode,
 		timeCronExpr: req.TimeCronExpr,
 		timeIntervalSec: req.TimeIntervalSec,
+		timeSpecAt: req.TimeSpecAt,
 	}, nil
 }
 

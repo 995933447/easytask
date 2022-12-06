@@ -103,8 +103,10 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 	)
 	err := conn.Where(DbFieldName + " = ?", srv.GetName()).Take(&srvModel).Error
 	if err != nil {
+		log.Error(ctx, err)
 		return err
 	}
+
 	var routeModelIds []uint64
 	for _, route := range srv.GetRoutes() {
 		routeModelId, err := toCallbackSrvRouteModelId(route.GetId())
@@ -114,8 +116,7 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 		}
 		routeModelIds = append(routeModelIds, routeModelId)
 	}
-	err = r.mustGetConn(ctx).
-		Where(DbFieldSrvId + " = ?", srvModel.Id).
+	err = conn.Where(DbFieldSrvId + " = ?", srvModel.Id).
 		Where(DbFieldId + " IN ?", routeModelIds).
 		Delete(&TaskCallbackSrvRouteModel{}).
 		Error
@@ -123,6 +124,41 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 		log.Error(ctx, err)
 		return err
 	}
+
+	type RouteNums struct {
+		Total int64 `json:"total"`
+		EnabledCheckHealthNum int64 `json:"enabled_check_health_num"`
+	}
+	routeNums := &RouteNums{}
+	err = conn.Model(&TaskCallbackSrvRouteModel{}).
+		Select("COUNT(1) AS total, COUNT(IF(" + DbFieldEnableHealthCheck + " > 0, 1, 0)) AS enabled_check_health_num").
+		Where(DbFieldSrvId + " = ?", srvModel.Id).
+		Take(&routeNums).
+		Error
+	if err != nil {
+		log.Error(ctx, err)
+		return err
+	}
+
+	if routeNums.Total == 0 {
+		if err = conn.Where(DbFieldId + " = ?", srvModel.Id).Delete(&TaskCallbackSrvModel{}).Error; err != nil {
+			log.Error(ctx, err)
+			return err
+		}
+		return nil
+	}
+
+	if routeNums.EnabledCheckHealthNum == 0 && srvModel.HasEnableHealthCheck {
+		err = conn.Model(&TaskCallbackSrvModel{}).
+			Where(DbFieldId + " = ?", srvModel.Id).
+			Update(DbFieldHasEnableHealthCheck, false).
+			Error
+		if err != nil {
+			log.Error(ctx, err)
+			return err
+		}
+	}
+
 	return nil
 }
 

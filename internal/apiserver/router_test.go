@@ -1,4 +1,4 @@
-package apihandler
+package apiserver
 
 import (
 	"reflect"
