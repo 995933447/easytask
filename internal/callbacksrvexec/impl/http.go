@@ -9,6 +9,7 @@ import (
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
+	simpletracectx "github.com/995933447/simpletrace/context"
 	"github.com/go-playground/validator"
 	"io"
 	"net/http"
@@ -159,6 +160,12 @@ func (e *HttpExec) doReq(ctx context.Context, input *doReqInput) error {
 
 	if input.TimeoutSec > 0 {
 		httpCli.Timeout = time.Duration(input.TimeoutSec) * time.Second
+	}
+
+	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
+		httpReq.Header.Add(httpproto.HeaderSimpleTraceId, traceCtx.GetTraceId())
+		httpReq.Header.Add(httpproto.HeaderSimpleTraceSpanId, traceCtx.GetSpanId())
+		httpReq.Header.Add(httpproto.HeaderSimpleTraceParentSpanId, traceCtx.GetParentSpanId())
 	}
 
 	httpResp, err := httpCli.Do(httpReq)

@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	internalerr "github.com/995933447/easytask/internal/util/errs"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/easytask/pkg/contx"
 	"github.com/995933447/easytask/pkg/errs"
-	internalerr "github.com/995933447/easytask/internal/util/errs"
+	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
 	"github.com/ggicci/httpin"
 	"github.com/go-playground/validator"
 	"net/http"
@@ -133,7 +134,9 @@ func (r *Router) Boot(ctx context.Context) error {
 
 	for path, methodToHandlerMap := range r.routeMap {
 		srvMux.HandleFunc(path, func(writer http.ResponseWriter, req *http.Request) {
-			ctx := contx.New("api", req.Context())
+			traceId := req.Header.Get(httpproto.HeaderSimpleTraceId)
+			spanId := req.Header.Get(httpproto.HeaderSimpleTraceSpanId)
+			ctx := contx.ChildOf(contx.NewWithTrace("api", req.Context(), traceId, spanId))
 
 			handlerReflec, ok := methodToHandlerMap[req.Method]
 			if !ok {
