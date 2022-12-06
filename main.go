@@ -6,7 +6,7 @@ import (
 	electfactory "github.com/995933447/autoelect/factory"
 	"github.com/995933447/confloader"
 	distribmufactory "github.com/995933447/distribmu/factory"
-	"github.com/995933447/easytask/internal/apihandler"
+	"github.com/995933447/easytask/internal/apiserver"
 	callbacksrvexecimpl "github.com/995933447/easytask/internal/callbacksrvexec/impl"
 	"github.com/995933447/easytask/internal/registry"
 	"github.com/995933447/easytask/internal/repo"
