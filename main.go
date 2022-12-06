@@ -241,9 +241,9 @@ func runTaskWorker(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, elec
 	go engine.Run(ctx)
 }
 
-func runApiServer(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, taskCallbackSrvRepo repo.TaskCallbackSrvRepo) error {
+func runApiServer(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, reg registry.Registry) error {
 	router := apiserver.NewRouter(conf.ApiServerConf.Host, conf.ApiServerConf.Port)
-	if err := router.RegisterBatch(ctx, getApiRoutes(taskRepo, taskCallbackSrvRepo)); err != nil {
+	if err := router.RegisterBatch(ctx, getApiRoutes(taskRepo, reg)); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}
