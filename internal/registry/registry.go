@@ -46,6 +46,26 @@ func NewRegistry(
 	}
 }
 
+func (r *Registry) Discover(ctx context.Context, srvName string) (*task.TaskCallbackSrv, error) {
+	log := logger.MustGetSysLogger()
+
+	srvs, err := r.srvRepo.GetSrvs(
+		ctx,
+		optionstream.NewQueryStream(nil, 1, 0).SetOption(repo.QueryOptKeyEqName, srvName),
+	)
+	if err != nil {
+		log.Error(ctx, err)
+		return nil, err
+	}
+
+	if len(srvs) == 0 {
+		log.Warnf(ctx, "task callback server(name:%s) not found", srvName)
+		return nil, errs.ErrTaskCallbackServerNotFound
+	}
+
+	return srvs[0], nil
+}
+
 // 注册路由，如果服务名称已经存在，则增量添加路由
 func (r *Registry) Register(ctx context.Context, srv *task.TaskCallbackSrv) error {
 	if err := r.srvRepo.AddSrvRoutes(ctx, srv); err != nil {

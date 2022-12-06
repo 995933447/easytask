@@ -2,34 +2,25 @@ package apiserver
 
 import (
 	"context"
+	"github.com/995933447/easytask/internal/registry"
 	"github.com/995933447/easytask/internal/repo"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
-	"github.com/995933447/easytask/pkg/errs"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
-	"github.com/995933447/optionstream"
 )
 
-func AddTaskHandler(taskRepo repo.TaskRepo, taskCallbackSrvRepo repo.TaskCallbackSrvRepo) func(ctx context.Context, req *httpproto.AddTaskReq) (*httpproto.AddTaskResp, error) {
+func AddTaskHandler(taskRepo repo.TaskRepo, reg registry.Registry) func(ctx context.Context, req *httpproto.AddTaskReq) (*httpproto.AddTaskResp, error) {
 	return func(ctx context.Context, req *httpproto.AddTaskReq) (*httpproto.AddTaskResp, error) {
 		log := logger.MustGetSessLogger()
 
-		srvs, err := taskCallbackSrvRepo.GetSrvs(
-			ctx,
-			optionstream.NewQueryStream(nil, 1, 0).SetOption(repo.QueryOptKeyEqName, req.SrvName),
-			)
+		srv, err := reg.Discover(ctx, req.SrvName)
 		if err != nil {
 			log.Error(ctx, err)
 			return nil, err
 		}
 
-		if len(srvs) == 0 {
-			log.Warnf(ctx, "task callback server(name:%s) not found", req.SrvName)
-			return nil, NewHandleErr(errs.ErrCodeTaskCallbackSrvNotFound, err)
-		}
-
 		oneTask, err := task.NewTask(&task.NewTaskReq{
-			CallbackSrv: task.NewTaskCallbackSrv("", req.SrvName, nil, false),
+			CallbackSrv: srv,
 			CallbackPath: req.CallbackPath,
 			Name: req.Name,
 		})
@@ -58,12 +49,12 @@ func DelTaskHandler(taskRepo repo.TaskRepo) func(ctx context.Context, req *httpp
 	}
 }
 
-func RegisterTaskCallbackSrvHandler(taskCallbackSrvRepo repo.TaskCallbackSrvRepo) func(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq) (*httpproto.RegisterTaskCallbackSrvResp, error) {
+func RegisterTaskCallbackSrvHandler(reg registry.Registry) func(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq) (*httpproto.RegisterTaskCallbackSrvResp, error) {
 	return func(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq) (*httpproto.RegisterTaskCallbackSrvResp, error) {
 		routes := []*task.TaskCallbackSrvRoute{
 			task.NewTaskCallbackSrvRoute("", req.Schema, req.Host, req.Port, req.CallbackTimeoutSec, req.IsEnableHealthCheck),
 		}
-		err := taskCallbackSrvRepo.AddSrvRoutes(ctx, task.NewTaskCallbackSrv("", req.Name, routes, req.IsEnableHealthCheck))
+		err := reg.Register(ctx, task.NewTaskCallbackSrv("", req.Name, routes, req.IsEnableHealthCheck))
 		if err != nil {
 			logger.MustGetSessLogger().Error(ctx, err)
 			return nil, err
@@ -72,12 +63,12 @@ func RegisterTaskCallbackSrvHandler(taskCallbackSrvRepo repo.TaskCallbackSrvRepo
 	}
 }
 
-func UnregisterTaskCallbackSrvHandler(taskCallbackSrvRepo repo.TaskCallbackSrvRepo) func(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
+func UnregisterTaskCallbackSrvHandler(reg registry.Registry) func(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
 	return func(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
 		routes := []*task.TaskCallbackSrvRoute{
 			task.NewTaskCallbackSrvRoute("", req.Schema, req.Host, req.Port, 0, false),
 		}
-		err := taskCallbackSrvRepo.DelSrvRoutes(ctx, task.NewTaskCallbackSrv("", req.Name, routes, false))
+		err := reg.Unregister(ctx, task.NewTaskCallbackSrv("", req.Name, routes, false))
 		if err != nil {
 			logger.MustGetSessLogger().Error(ctx, err)
 			return nil, err
