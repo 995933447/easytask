@@ -7,8 +7,6 @@ import (
 	"sync"
 )
 
-type Level int
-
 type Logger interface {
 	Debug(ctx context.Context, content interface{})
 
