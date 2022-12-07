@@ -9,6 +9,7 @@ import (
 	simpletracectx "github.com/995933447/simpletrace/context"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -27,7 +28,7 @@ type HttpRpc struct {
 
 func NewHttpRpc(apiSrvAddr string) *HttpRpc {
 	return &HttpRpc{
-		apiSrvAddr: apiSrvAddr,
+		apiSrvAddr: strings.TrimRight(apiSrvAddr, "/"),
 	}
 }
 
@@ -82,7 +83,7 @@ func (c *HttpRpc) post(ctx context.Context, path string, req, resp any, opts ...
 		return err
 	}
 
-	httpReq, err := http.NewRequest(http.MethodPost, c.apiSrvAddr, bytes.NewBuffer(httpReqBody))
+	httpReq, err := http.NewRequest(http.MethodPost, c.apiSrvAddr + path, bytes.NewBuffer(httpReqBody))
 	if err != nil {
 		return err
 	}
