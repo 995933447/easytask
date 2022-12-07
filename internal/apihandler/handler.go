@@ -57,7 +57,17 @@ func (s *TaskService) DelTask(ctx context.Context, req *httpproto.DelTaskReq) (*
 	return &httpproto.DelTaskResp{}, nil
 }
 
-func (s *TaskService) RegisterTaskCallbackSrv(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq) (*httpproto.RegisterTaskCallbackSrvResp, error) {
+func NewRegistryService(reg *registry.Registry) *RegistryService {
+	return &RegistryService{
+		reg: reg,
+	}
+}
+
+type RegistryService struct {
+	reg *registry.Registry
+}
+
+func (s *RegistryService) RegisterTaskCallbackSrv(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq) (*httpproto.RegisterTaskCallbackSrvResp, error) {
 	routes := []*task.TaskCallbackSrvRoute{
 		task.NewTaskCallbackSrvRoute("", req.Schema, req.Host, req.Port, req.CallbackTimeoutSec, req.IsEnableHealthCheck),
 	}
@@ -69,7 +79,7 @@ func (s *TaskService) RegisterTaskCallbackSrv(ctx context.Context, req *httpprot
 	return &httpproto.RegisterTaskCallbackSrvResp{}, nil
 }
 
-func (s *TaskService) UnregisterTaskCallbackSrv(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
+func (s *RegistryService) UnregisterTaskCallbackSrv(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
 	routes := []*task.TaskCallbackSrvRoute{
 		task.NewTaskCallbackSrvRoute("", req.Schema, req.Host, req.Port, 0, false),
 	}

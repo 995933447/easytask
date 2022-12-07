@@ -10,12 +10,15 @@ import (
 )
 
 func getHttpApiRoutes(taskRepo repo.TaskRepo, reg *registry.Registry) []*apiserver.HttpRoute {
-	taskSrv := apihandler.NewTaskService(taskRepo, reg)
+	var (
+		taskSrv = apihandler.NewTaskService(taskRepo, reg)
+		registrySrv = apihandler.NewRegistryService(reg)
+	)
 	return []*apiserver.HttpRoute{
 		{Path: api.AddTaskCmdPath, Method: http.MethodPost, Handler: taskSrv.AddTask},
-		{Path: api.RegisterTaskCallbackSrvCmdPath, Method: http.MethodPost, Handler: taskSrv.RegisterTaskCallbackSrv},
 		{Path: api.DelTaskCmdPath, Method: http.MethodPost, Handler: taskSrv.DelTask},
-		{Path: api.UnregisterTaskCallbackSrvCmdPath, Method: http.MethodPost, Handler: taskSrv.UnregisterTaskCallbackSrv},
+		{Path: api.RegisterTaskCallbackSrvCmdPath, Method: http.MethodPost, Handler: registrySrv.RegisterTaskCallbackSrv},
+		{Path: api.UnregisterTaskCallbackSrvCmdPath, Method: http.MethodPost, Handler: registrySrv.UnregisterTaskCallbackSrv},
 	}
 }
 
