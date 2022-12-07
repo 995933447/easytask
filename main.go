@@ -45,9 +45,13 @@ type RedisConf struct {
 	Nodes []*RedisNodeConf `json:"nodes"`
 }
 
-type ApiServerConf struct {
+type HttpApiSrvConf struct {
 	Host string `json:"host"`
 	Port int `json:"port"`
+}
+
+type ApiSrvConf struct {
+	*HttpApiSrvConf `json:"http"`
 }
 
 type Conf struct {
@@ -60,7 +64,7 @@ type Conf struct {
 	*RedisConf `json:"redis"`
 	HealthCheckWorkerPoolSize uint `json:"health_check_worker_pool_size"`
 	LoggerConf *logger.Conf `json:"log"`
-	*ApiServerConf `json:"api_server"`
+	*ApiSrvConf `json:"api_server"`
 }
 
 func main() {
@@ -110,7 +114,7 @@ func main() {
 	}()
 	signal.Notify(signCh, syscall.SIGINT, syscall.SIGTERM)
 
-	if err = runApiServer(ctx, conf, taskRepo, reg); err != nil {
+	if err = runHttpApiServer(ctx, conf, taskRepo, reg); err != nil {
 		panic(any(err))
 	}
 }
@@ -242,9 +246,9 @@ func runTaskWorker(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, elec
 	go engine.Run(ctx)
 }
 
-func runApiServer(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, reg *registry.Registry) error {
-	router := apiserver.NewRouter(conf.ApiServerConf.Host, conf.ApiServerConf.Port)
-	if err := router.RegisterBatch(ctx, getApiRoutes(taskRepo, reg)); err != nil {
+func runHttpApiServer(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, reg *registry.Registry) error {
+	router := apiserver.NewHttpRouter(conf.HttpApiSrvConf.Host, conf.HttpApiSrvConf.Port)
+	if err := router.RegisterBatch(ctx, getHttpApiRoutes(taskRepo, reg)); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}

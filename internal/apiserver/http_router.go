@@ -18,22 +18,17 @@ import (
 	"sync/atomic"
 )
 
-type handlerReflect struct {
-	handler reflect.Value
-	req reflect.Type
-}
-
-type Route struct {
+type HttpRoute struct {
 	Path string `validate:"required"`
 	Method string `validate:"required"`
 	Handler any `validate:"required"`
 }
 
-func (r *Route) Check() error {
+func (r *HttpRoute) Check() error {
 	return validator.New().Struct(r)
 }
 
-type Router struct {
+type HttpRouter struct {
 	host string
 	port int
 	routeMap map[string]map[string]*handlerReflect
@@ -41,7 +36,7 @@ type Router struct {
 	isBooted atomic.Bool
 }
 
-func (r *Router) RegisterBatch(ctx context.Context, routes []*Route) error {
+func (r *HttpRouter) RegisterBatch(ctx context.Context, routes []*HttpRoute) error {
 	for _, route := range routes {
 		if err := r.Register(ctx, route); err != nil {
 			logger.MustGetSysLogger().Error(ctx, err)
@@ -51,7 +46,7 @@ func (r *Router) RegisterBatch(ctx context.Context, routes []*Route) error {
 	return nil
 }
 
-func (r *Router) Register(ctx context.Context, route *Route) error {
+func (r *HttpRouter) Register(ctx context.Context, route *HttpRoute) error {
 	if r.isBooted.Load() {
 		return internalerr.ErrServerStarted
 	}
@@ -99,6 +94,11 @@ func (r *Router) Register(ctx context.Context, route *Route) error {
 
 	r.routeMu.Lock()
 	defer r.routeMu.Unlock()
+
+	if r.isBooted.Load() {
+		return internalerr.ErrServerStarted
+	}
+
 	methodToHandlerMap, ok := r.routeMap[route.Path]
 	if !ok {
 		methodToHandlerMap = make(map[string]*handlerReflect)
@@ -112,12 +112,16 @@ func (r *Router) Register(ctx context.Context, route *Route) error {
 	return nil
 }
 
-func (r *Router) Boot(ctx context.Context) error {
+func (r *HttpRouter) Boot(ctx context.Context) error {
 	if r.isBooted.Load() {
 		return internalerr.ErrServerStarted
 	}
-
+	r.routeMu.Lock()
+	if r.isBooted.Load() {
+		return internalerr.ErrServerStarted
+	}
 	r.isBooted.Store(true)
+	r.routeMu.Unlock()
 	defer func() {
 		if r.isBooted.Load() {
 			r.isBooted.Store(false)
@@ -193,7 +197,7 @@ func (r *Router) Boot(ctx context.Context) error {
 	return nil
 }
 
-func (r *Router) writeResp(ctx context.Context, writer http.ResponseWriter, code int, content []byte, header map[string]string) error {
+func (r *HttpRouter) writeResp(ctx context.Context, writer http.ResponseWriter, code int, content []byte, header map[string]string) error {
 	writer.WriteHeader(code)
 
 	for key, val := range header {
@@ -220,8 +224,8 @@ func (r *Router) writeResp(ctx context.Context, writer http.ResponseWriter, code
 	return nil
 }
 
-func NewRouter(host string, port int) *Router {
-	return &Router{
+func NewHttpRouter(host string, port int) *HttpRouter {
+	return &HttpRouter{
 		host: host,
 		port: port,
 		routeMap: make(map[string]map[string]*handlerReflect),

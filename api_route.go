@@ -8,8 +8,8 @@ import (
 	"net/http"
 )
 
-func getApiRoutes(taskRepo repo.TaskRepo, reg *registry.Registry) []*apiserver.Route {
-	return []*apiserver.Route{
+func getHttpApiRoutes(taskRepo repo.TaskRepo, reg *registry.Registry) []*apiserver.HttpRoute {
+	return []*apiserver.HttpRoute{
 		{Path: api.AddTaskCmdPath, Method: http.MethodPost, Handler: apiserver.AddTaskHandler(taskRepo, reg)},
 		{Path: api.RegisterTaskCallbackSrvCmdPath, Method: http.MethodPost, Handler: apiserver.RegisterTaskCallbackSrvHandler(reg)},
 		{Path: api.DelTaskCmdPath, Method: http.MethodPost, Handler: apiserver.DelTaskHandler(taskRepo)},
