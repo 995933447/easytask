@@ -1,0 +1,4 @@
+FROM mysql:8.0.21
+ENV MYSQL_ALLOW_EMPTY_PASSWORD true
+VOLUME /var/lib/mysql
+EXPOSE 3306
