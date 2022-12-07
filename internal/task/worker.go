@@ -47,7 +47,7 @@ func (e *workerEngine) createWorkerPool() {
 func (e *workerEngine) runWorker(taskIn chan *Task) {
 	for {
 		e.sched.TaskWorkerReady(taskIn)
-		task := <-taskIn
+		task := <- taskIn
 		ctx := contx.New("task", context.TODO())
 		log := logger.MustGetSysLogger()
 		locked, err := e.sched.LockTaskForRun(ctx, task)

@@ -21,53 +21,62 @@ var TimeoutOpt = func(timeout time.Duration) HttpReqOpt {
 	}
 }
 
-type HttpClient struct {
+type HttpRpc struct {
 	apiSrvAddr string
 }
 
-func NewHttpCli(apiSrvAddr string) *HttpClient {
-	return &HttpClient{
+func NewHttpRpc(apiSrvAddr string) *HttpRpc {
+	return &HttpRpc{
 		apiSrvAddr: apiSrvAddr,
 	}
 }
 
-func (c *HttpClient) AddTask(ctx context.Context, req *httpproto.AddTaskReq, opts ...HttpReqOpt) (*httpproto.AddTaskResp, error) {
+func (c *HttpRpc) AddTask(ctx context.Context, req *httpproto.AddTaskReq, opts ...HttpReqOpt) (*httpproto.AddTaskResp, error) {
 	var resp httpproto.AddTaskResp
-	err := c.post(contx.New("api", ctx), req, &resp, opts...)
+	err := c.post(contx.New("api", ctx), httpproto.AddTaskCmdPath, req, &resp, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *HttpClient) DelTask(ctx context.Context, req *httpproto.DelTaskReq, opts ...HttpReqOpt) (*httpproto.DelTaskResp, error) {
+func (c *HttpRpc) DelTask(ctx context.Context, req *httpproto.DelTaskReq, opts ...HttpReqOpt) (*httpproto.DelTaskResp, error) {
 	var resp httpproto.DelTaskResp
-	err := c.post(contx.New("api", ctx), req, &resp, opts...)
+	err := c.post(contx.New("api", ctx), httpproto.DelTaskCmdPath, req, &resp, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *HttpClient) RegisterTaskCallbackSrv(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq, opts ...HttpReqOpt) (*httpproto.RegisterTaskCallbackSrvResp, error) {
+func (c *HttpRpc) ConfirmTask(ctx context.Context, req *httpproto.ConfirmTaskReq, opts ...HttpReqOpt) (*httpproto.ConfirmTaskResp, error) {
+	var resp httpproto.ConfirmTaskResp
+	err := c.post(contx.New("api", ctx), httpproto.ConfirmTaskCmdPath, req, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *HttpRpc) RegisterTaskCallbackSrv(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq, opts ...HttpReqOpt) (*httpproto.RegisterTaskCallbackSrvResp, error) {
 	var resp httpproto.RegisterTaskCallbackSrvResp
-	err := c.post(contx.New("api", ctx), req, &resp, opts...)
+	err := c.post(contx.New("api", ctx), httpproto.RegisterTaskCallbackSrvCmdPath, req, &resp, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *HttpClient) UnregisterTaskCallbackSrv(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq, opts ...HttpReqOpt) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
+func (c *HttpRpc) UnregisterTaskCallbackSrv(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq, opts ...HttpReqOpt) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
 	var resp httpproto.UnregisterTaskCallbackSrvResp
-	err := c.post(contx.New("api", ctx), req, &resp, opts...)
+	err := c.post(contx.New("api", ctx), httpproto.UnregisterTaskCallbackSrvCmdPath, req, &resp, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *HttpClient) post(ctx context.Context, req, resp any, opts ...HttpReqOpt) error {
+func (c *HttpRpc) post(ctx context.Context, path string, req, resp any, opts ...HttpReqOpt) error {
 	httpReqBody, err := json.Marshal(req)
 	if err != nil {
 		return err

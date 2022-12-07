@@ -24,6 +24,16 @@ type DelTaskReq struct {
 type DelTaskResp struct {
 }
 
+type ConfirmTaskReq struct {
+	Id string `json:"id"`
+	IsSuccess bool `json:"is_success"`
+	Extra []byte `json:"extra"`
+	TaskRunTimes int `json:"task_run_times"`
+}
+
+type ConfirmTaskResp struct {
+}
+
 type RegisterTaskCallbackSrvReq struct {
 	Name string `json:"name"`
 	Schema string `json:"schema"`

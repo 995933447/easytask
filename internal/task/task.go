@@ -65,7 +65,7 @@ func (r *TaskResp) GetTaskRunTimes() int {
 	return r.taskRunTimes
 }
 
-func newTaskResp(taskId string, isRunInAsync bool, taskStatus Status, taskRunTimes int, extra any) *TaskResp {
+func NewTaskResp(taskId string, isRunInAsync bool, taskStatus Status, taskRunTimes int, extra any) *TaskResp {
 	return &TaskResp{
 		taskId: taskId,
 		isRunInAsync: isRunInAsync,
@@ -282,7 +282,7 @@ func (t *Task) run(ctx context.Context, callbackExec callbacksrvexec.TaskCallbac
 		status = StatusSuccess
 	}
 
-	return newTaskResp(t.id, callbackResp.IsRunInAsync(), status, t.runTimes, callbackResp.GetExtra()), nil
+	return NewTaskResp(t.id, callbackResp.IsRunInAsync(), status, t.runTimes, callbackResp.GetExtra()), nil
 }
 
 type NewTaskReq struct {

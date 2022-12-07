@@ -57,6 +57,21 @@ func (s *TaskService) DelTask(ctx context.Context, req *httpproto.DelTaskReq) (*
 	return &httpproto.DelTaskResp{}, nil
 }
 
+func (s *TaskService) ConfirmTask(ctx context.Context, req *httpproto.ConfirmTaskReq) (*httpproto.ConfirmTaskResp, error) {
+	var taskStatus task.Status
+	if req.IsSuccess {
+		taskStatus = task.StatusSuccess
+	} else {
+		taskStatus = task.StatusFailed
+	}
+	err := s.taskRepo.ConfirmTask(ctx, task.NewTaskResp(req.Id, true, taskStatus, req.TaskRunTimes, nil))
+	if err != nil {
+		logger.MustGetSessLogger().Error(ctx, err)
+		return nil, err
+	}
+	return &httpproto.ConfirmTaskResp{}, nil
+}
+
 func NewRegistryService(reg *registry.Registry) *RegistryService {
 	return &RegistryService{
 		reg: reg,
