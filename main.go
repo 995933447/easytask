@@ -55,7 +55,7 @@ type ApiSrvConf struct {
 }
 
 type Conf struct {
-	IsClusterMode bool 	`json:"is_cluster_mode"`
+	IsClusterMode bool `json:"is_cluster_mode"`
 	ClusterName string `json:"cluster_name"`
 	TaskWorkerPoolSize uint `json:"task_worker_pool_size"`
 	ElectDriver string `json:"elect_driver"`
