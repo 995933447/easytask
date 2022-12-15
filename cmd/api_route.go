@@ -1,4 +1,4 @@
-package easytask
+package main
 
 import (
 	"github.com/995933447/easytask/internal/apihandler"

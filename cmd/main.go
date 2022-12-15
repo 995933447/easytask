@@ -1,4 +1,4 @@
-package easytask
+package main
 
 import (
 	"context"
@@ -55,16 +55,16 @@ type ApiSrvConf struct {
 }
 
 type Conf struct {
-	IsClusterMode bool `json:"is_cluster_mode"`
-	ClusterName string `json:"cluster_name"`
-	TaskWorkerPoolSize uint `json:"task_worker_pool_size"`
-	ElectDriver string `json:"elect_driver"`
-	*MysqlConf `json:"mysql"`
-	*EtcdConf `json:"etcd"`
-	*RedisConf `json:"redis"`
+	IsClusterMode             bool `json:"is_cluster_mode"`
+	ClusterName               string `json:"cluster_name"`
+	TaskWorkerPoolSize        uint `json:"task_worker_pool_size"`
+	ElectDriver               string `json:"elect_driver"`
+	*MysqlConf                `json:"mysql"`
+	*EtcdConf                 `json:"etcd"`
+	*RedisConf                `json:"redis"`
 	HealthCheckWorkerPoolSize uint `json:"health_check_worker_pool_size"`
-	LoggerConf *logger.Conf `json:"log"`
-	*ApiSrvConf `json:"api_server"`
+	LoggerConf                *logger.Conf `json:"log"`
+	*ApiSrvConf               `json:"api_server"`
 }
 
 func main() {
