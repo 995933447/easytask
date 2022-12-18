@@ -1,13 +1,13 @@
-package impl
+package callbackexec
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/995933447/easytask/internal/callbacksrvexec"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
 	simpletracectx "github.com/995933447/simpletrace/context"
 	"github.com/go-playground/validator"
@@ -24,16 +24,16 @@ func NewHttpExec() *HttpExec {
 	return &HttpExec{}
 }
 
-var _ callbacksrvexec.TaskCallbackSrvExec = (*HttpExec)(nil)
+var _ task.TaskCallbackSrvExec = (*HttpExec)(nil)
 
-func (e *HttpExec) CallbackSrv(ctx context.Context, task *task.Task, _ any) (*callbacksrvexec.TaskCallbackSrvResp, error) {
+func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (*task.TaskCallbackSrvResp, error) {
 	var (
-		log = logger.MustGetSysLogger()
+		log = logger.MustGetTaskLogger()
 		httpReq = &httpproto.TaskCallbackReq{
 			Cmd: httpproto.HttpCallbackCmdTaskCallback,
-			Arg:      task.GetArg(),
-			TaskName: task.GetName(),
-			RunTimes: task.GetRunTimes(),
+			Arg:      oneTask.GetArg(),
+			TaskName: oneTask.GetName(),
+			RunTimes: oneTask.GetRunTimes(),
 		}
 		httpResp = &httpproto.TaskCallbackResp{}
 	)
@@ -45,17 +45,17 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, task *task.Task, _ any) (*ca
 	}
 
 	var (
-		route = task.GetCallbackSrv().GetRandomRoute()
+		route = oneTask.GetCallbackSrv().GetRandomRoute()
 		timeoutSec int
 	)
-	if route.GetCallbackTimeoutSec() > task.GetMaxRunTimeSec() {
-		timeoutSec = task.GetMaxRunTimeSec()
+	if route.GetCallbackTimeoutSec() > oneTask.GetMaxRunTimeSec() {
+		timeoutSec = oneTask.GetMaxRunTimeSec()
 	} else {
 		timeoutSec = route.GetCallbackTimeoutSec()
 	}
-	err = e.doReq(ctx, &doReqInput{
+	err = e.doReq(contxt.ChildOf(ctx), &doReqInput{
 		Log: log,
-		Path: task.GetCallbackPath(),
+		Path: oneTask.GetCallbackPath(),
 		Route: route,
 		TimeoutSec: timeoutSec,
 		ReqBytes: httpReqBytes,
@@ -66,12 +66,12 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, task *task.Task, _ any) (*ca
 		return nil, err
 	}
 
-	return callbacksrvexec.NewCallbackSrvResp(httpResp.IsRunInAsync, httpResp.IsSuccess, httpResp.Extra), nil
+	return task.NewCallbackSrvResp(httpResp.IsRunInAsync, httpResp.IsSuccess, httpResp.Extra), nil
 }
 
-func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*callbacksrvexec.HeartBeatResp, error) {
+func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*task.HeartBeatResp, error) {
 	var (
-		log = logger.MustGetSysLogger()
+		log = logger.MustGetTaskLogger()
 		httpReq = &httpproto.HeartBeatReq{
 			Cmd: httpproto.HttpCallbackCmdTaskHeartBeat,
 		}
@@ -94,7 +94,7 @@ func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*c
 		go func(route *task.TaskCallbackSrvRoute) {
 			defer wg.Done()
 
-			err = e.doReq(ctx, &doReqInput{
+			err = e.doReq(contxt.ChildOf(ctx), &doReqInput{
 				Log: log,
 				Route: route,
 				TimeoutSec: route.GetCallbackTimeoutSec(),
@@ -118,7 +118,7 @@ func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*c
 	}
 	wg.Wait()
 
-	return callbacksrvexec.NewHeartBeatResp(replyRoutes, noReplyRoutes), nil
+	return task.NewHeartBeatResp(replyRoutes, noReplyRoutes), nil
 }
 
 type doReqInput struct {

@@ -4,7 +4,9 @@ import (
 	"context"
 	"github.com/995933447/log-go"
 	"github.com/995933447/log-go/impls/loggerwriters"
+	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 type Logger interface {
@@ -34,62 +36,87 @@ type Logger interface {
 }
 
 type Conf struct{
-	SysProcLogDir string `json:"sys_proc_log_dir"`
-	SessionProcLogDir string `json:"session_proc_log_dir"`
+	LogDir string `json:"log_dir"`
 	FileSize int64 `json:"file_size"`
-}
-
-var conf *Conf
-
-func Init(cfg *Conf) {
-	conf = cfg
-}
-
-func hasInit() bool {
-	return conf == nil
+	Level string `json:"level"`
 }
 
 var (
-	sysLogger Logger
-	newSysLoggerMu sync.Mutex
-
-	sessionLogger Logger
-	newSessionLoggerMu sync.Mutex
+	hasInit atomic.Bool
+	initMu sync.Mutex
 )
 
-func MustGetSysLogger() Logger {
-	if !hasInit() {
+var (
+	sysLogger Logger
+	sessionLogger Logger
+	electLogger Logger
+	repoLogger Logger
+	taskLogger Logger
+	registryLogger Logger
+)
+
+func Init(conf *Conf) {
+	if hasInit.Load() {
+		return
+	}
+	initMu.Lock()
+	defer initMu.Unlock()
+	if hasInit.Load() {
+		return
+	}
+	conf.LogDir = strings.TrimRight(conf.LogDir, "/")
+	sysLogger = NewLogger(conf.LogDir + "/sys", conf.FileSize, conf.Level)
+	sessionLogger = NewLogger(conf.LogDir + "/session", conf.FileSize, conf.Level)
+	electLogger = NewLogger(conf.LogDir + "/elect", conf.FileSize, conf.Level)
+	repoLogger = NewLogger(conf.LogDir + "/repo", conf.FileSize, conf.Level)
+	taskLogger = NewLogger(conf.LogDir + "/task", conf.FileSize, conf.Level)
+	registryLogger = NewLogger(conf.LogDir + "/registry", conf.FileSize, conf.Level)
+	hasInit.Store(true)
+}
+
+func MustGetRegistryLogger() Logger {
+	if !hasInit.Load() {
 		panic(any("init not finish"))
 	}
-	if sysLogger != nil {
-		return sysLogger
+	return registryLogger
+}
+
+func MustGetTaskLogger() Logger {
+	if !hasInit.Load() {
+		panic(any("init not finish"))
 	}
-	newSysLoggerMu.Lock()
-	defer newSessionLoggerMu.Unlock()
-	if sysLogger != nil {
-		return sysLogger
+	return taskLogger
+}
+
+func MustGetElectLogger() Logger {
+	if !hasInit.Load() {
+		panic(any("init not finish"))
 	}
-	sysLogger = NewLogger(conf.SysProcLogDir, conf.FileSize)
+	return electLogger
+}
+
+func MustGetRepoLogger() Logger {
+	if !hasInit.Load() {
+		panic(any("init not finish"))
+	}
+	return repoLogger
+}
+
+func MustGetSysLogger() Logger {
+	if !hasInit.Load() {
+		panic(any("init not finish"))
+	}
 	return sysLogger
 }
 
 func MustGetSessLogger() Logger {
-	if !hasInit() {
+	if !hasInit.Load() {
 		panic(any("init not finish"))
 	}
-	if sessionLogger != nil {
-		return sessionLogger
-	}
-	newSessionLoggerMu.Lock()
-	defer newSessionLoggerMu.Unlock()
-	if sessionLogger != nil {
-		return sessionLogger
-	}
-	sessionLogger = NewLogger(conf.SessionProcLogDir, conf.FileSize)
 	return sessionLogger
 }
 
-func NewLogger(baseDir string, maxFileSize int64) Logger {
+func NewLogger(baseDir string, maxFileSize int64, level string) Logger {
 	writer := loggerwriters.NewFileLoggerWriter(
 		baseDir,
 		maxFileSize,
@@ -103,5 +130,20 @@ func NewLogger(baseDir string, maxFileSize int64) Logger {
 			panic(any(err))
 		}
 	}()
-	return log.NewLogger(writer)
+	logger := log.NewLogger(writer)
+	switch strings.ToLower(level) {
+	case "debug":
+		logger.SetLogLevel(log.LevelDebug)
+	case "info":
+		logger.SetLogLevel(log.LevelInfo)
+	case "warn":
+		logger.SetLogLevel(log.LevelWarn)
+	case "error":
+		logger.SetLogLevel(log.LevelError)
+	case "panic":
+		logger.SetLogLevel(log.LevelPanic)
+	case "fatal":
+		logger.SetLogLevel(log.LevelFatal)
+	}
+	return logger
 }

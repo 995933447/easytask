@@ -1,15 +1,14 @@
 package apihandler
 
 import (
+	"context"
 	"github.com/995933447/easytask/internal/registry"
-	"github.com/995933447/easytask/internal/repo"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
-	"context"
 )
 
-func NewTaskService(taskRepo repo.TaskRepo, reg *registry.Registry) *TaskService {
+func NewTaskService(taskRepo task.TaskRepo, reg *registry.Registry) *TaskService {
 	return &TaskService{
 		taskRepo: taskRepo,
 		reg: reg,
@@ -17,8 +16,8 @@ func NewTaskService(taskRepo repo.TaskRepo, reg *registry.Registry) *TaskService
 }
 
 type TaskService struct {
-	taskRepo repo.TaskRepo
-	reg *registry.Registry
+	taskRepo task.TaskRepo
+	reg      *registry.Registry
 }
 
 func (s *TaskService) AddTask(ctx context.Context, req *httpproto.AddTaskReq) (*httpproto.AddTaskResp, error) {

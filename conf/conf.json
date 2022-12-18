@@ -7,20 +7,21 @@
 
   "elect_driver": "redis",
   "mysql": {
-      "dsn":"user:pass@tcp(192.168.223.129:3306)/easytask?charset=utf8mb4&parseTime=True&loc=Local"
+      "dsn":"root:@tcp(127.0.0.1:3306)/easytask?charset=utf8mb4&parseTime=True&loc=Local"
   },
   "etcd": {
       "endpoints": ["127.0.0.1:2379"]
   },
   "redis": {
       "nodes": [
-          {"host":"192.168.223.129", "port": 6379}
+          {"host":"127.0.0.1", "port": 6379}
       ]
   },
 
   "log": {
       "sys_proc_log_dir":"/var/log/easytask/sys/",
-      "session_proc_log_dir": "/var/log/easytask/access/"
+      "session_proc_log_dir": "/var/log/easytask/access/",
+      "level": "warn"
   },
 
   "api_server": {

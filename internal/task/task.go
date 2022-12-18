@@ -2,9 +2,9 @@ package task
 
 import (
 	"context"
-	"github.com/995933447/easytask/internal/callbacksrvexec"
-	"github.com/995933447/easytask/internal/util/logger"
 	"errors"
+	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/go-playground/validator"
 	"github.com/gorhill/cronexpr"
 	"math/rand"
@@ -266,8 +266,8 @@ func (t *Task) IncrRunTimes() {
 	t.runTimes++
 }
 
-func (t *Task) run(ctx context.Context, callbackExec callbacksrvexec.TaskCallbackSrvExec) (*TaskResp, error) {
-	callbackResp, err := callbackExec.CallbackSrv(ctx, t, nil)
+func (t *Task) run(ctx context.Context, callbackExec TaskCallbackSrvExec) (*TaskResp, error) {
+	callbackResp, err := callbackExec.CallbackSrv(contxt.ChildOf(ctx), t, nil)
 	if err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, err

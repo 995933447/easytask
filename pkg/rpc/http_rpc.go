@@ -34,7 +34,7 @@ func NewHttpRpc(apiSrvAddr string) *HttpRpc {
 
 func (c *HttpRpc) AddTask(ctx context.Context, req *httpproto.AddTaskReq, opts ...HttpReqOpt) (*httpproto.AddTaskResp, error) {
 	var resp httpproto.AddTaskResp
-	err := c.post(contx.New("api", ctx), httpproto.AddTaskCmdPath, req, &resp, opts...)
+	err := c.post(contxt.New("api", ctx), httpproto.AddTaskCmdPath, req, &resp, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (c *HttpRpc) AddTask(ctx context.Context, req *httpproto.AddTaskReq, opts .
 
 func (c *HttpRpc) DelTask(ctx context.Context, req *httpproto.DelTaskReq, opts ...HttpReqOpt) (*httpproto.DelTaskResp, error) {
 	var resp httpproto.DelTaskResp
-	err := c.post(contx.New("api", ctx), httpproto.DelTaskCmdPath, req, &resp, opts...)
+	err := c.post(contxt.New("api", ctx), httpproto.DelTaskCmdPath, req, &resp, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (c *HttpRpc) DelTask(ctx context.Context, req *httpproto.DelTaskReq, opts .
 
 func (c *HttpRpc) ConfirmTask(ctx context.Context, req *httpproto.ConfirmTaskReq, opts ...HttpReqOpt) (*httpproto.ConfirmTaskResp, error) {
 	var resp httpproto.ConfirmTaskResp
-	err := c.post(contx.New("api", ctx), httpproto.ConfirmTaskCmdPath, req, &resp, opts...)
+	err := c.post(contxt.New("api", ctx), httpproto.ConfirmTaskCmdPath, req, &resp, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (c *HttpRpc) ConfirmTask(ctx context.Context, req *httpproto.ConfirmTaskReq
 
 func (c *HttpRpc) RegisterTaskCallbackSrv(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq, opts ...HttpReqOpt) (*httpproto.RegisterTaskCallbackSrvResp, error) {
 	var resp httpproto.RegisterTaskCallbackSrvResp
-	err := c.post(contx.New("api", ctx), httpproto.RegisterTaskCallbackSrvCmdPath, req, &resp, opts...)
+	err := c.post(contxt.New("api", ctx), httpproto.RegisterTaskCallbackSrvCmdPath, req, &resp, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (c *HttpRpc) RegisterTaskCallbackSrv(ctx context.Context, req *httpproto.Re
 
 func (c *HttpRpc) UnregisterTaskCallbackSrv(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq, opts ...HttpReqOpt) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
 	var resp httpproto.UnregisterTaskCallbackSrvResp
-	err := c.post(contx.New("api", ctx), httpproto.UnregisterTaskCallbackSrvCmdPath, req, &resp, opts...)
+	err := c.post(contxt.New("api", ctx), httpproto.UnregisterTaskCallbackSrvCmdPath, req, &resp, opts...)
 	if err != nil {
 		return nil, err
 	}

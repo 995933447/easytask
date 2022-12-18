@@ -1,32 +1,31 @@
-package sched
+package task
 
 import (
 	"context"
 	"github.com/995933447/autoelect"
-	"github.com/995933447/easytask/internal/repo"
-	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/easytask/pkg/contxt"
 	"time"
 )
 
 type Sched struct {
-	taskWorkerCh chan chan *task.Task
-	taskRepo repo.TaskRepo
-	taskRespCh chan *task.TaskResp
-	elect autoelect.AutoElection
-	isClusterMode 		bool
+	taskWorkerCh  chan chan *Task
+	taskRepo      TaskRepo
+	taskRespCh    chan *TaskResp
+	elect         autoelect.AutoElection
+	isClusterMode bool
 }
 
-func (s *Sched) LockTaskForRun(ctx context.Context, task *task.Task) (bool, error) {
-	locked, err := s.taskRepo.LockTask(ctx, task)
+func (s *Sched) LockTaskForRun(ctx context.Context, task *Task) (bool, error) {
+	locked, err := s.taskRepo.LockTask(contxt.ChildOf(ctx), task)
 	if err != nil {
-		logger.MustGetSysLogger().Error(ctx, err)
+		logger.MustGetTaskLogger().Error(ctx, err)
 		return false, err
 	}
 	return locked, nil
 }
 
-func (s *Sched) TaskWorkerReady(taskIn chan *task.Task) {
+func (s *Sched) TaskWorkerReady(taskIn chan *Task) {
 	s.taskWorkerCh <- taskIn
 }
 
@@ -42,7 +41,7 @@ func (s *Sched) schedule(ctx context.Context) {
 			continue
 		}
 
-		tasks, err := s.taskRepo.TimeoutTasks(ctx, 1000)
+		tasks, err := s.taskRepo.TimeoutTasks(contxt.ChildOf(ctx), 1000)
 		if err != nil {
 			logger.MustGetSysLogger().Error(ctx, err)
 			continue
@@ -62,7 +61,7 @@ func (s *Sched) schedule(ctx context.Context) {
 
 func (s *Sched) watchToConfirmTaskRes(ctx context.Context) {
 	for {
-		var taskResps []*task.TaskResp
+		var taskResps []*TaskResp
 		taskResp := <-s.taskRespCh
 		taskResps = append(taskResps, taskResp)
 		var noMoreTaskResp bool
@@ -79,22 +78,22 @@ func (s *Sched) watchToConfirmTaskRes(ctx context.Context) {
 			}
 		}
 
-		err := s.taskRepo.ConfirmTasks(ctx, taskResps)
+		err := s.taskRepo.ConfirmTasks(contxt.ChildOf(ctx), taskResps)
 		if err != nil {
 			logger.MustGetSysLogger().Error(ctx, err)
 		}
 	}
 }
 
-func (s *Sched) SubmitTaskResp(resp *task.TaskResp) {
+func (s *Sched) SubmitTaskResp(resp *TaskResp) {
 	s.taskRespCh <- resp
 }
 
-func NewSched(isClusterMode bool, taskRepo repo.TaskRepo, elect autoelect.AutoElection) *Sched {
+func NewSched(isClusterMode bool, taskRepo TaskRepo, elect autoelect.AutoElection) *Sched {
 	return &Sched{
-		taskWorkerCh: make(chan chan *task.Task),
+		taskWorkerCh: make(chan chan *Task),
 		taskRepo: taskRepo,
-		taskRespCh: make(chan *task.TaskResp),
+		taskRespCh: make(chan *TaskResp),
 		elect: elect,
 		isClusterMode: isClusterMode,
 	}

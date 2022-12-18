@@ -1,10 +1,10 @@
 package mysql
 
 import (
+	"errors"
 	"fmt"
 	"github.com/995933447/dbdriverutil/field"
 	"github.com/995933447/easytask/internal/task"
-	"errors"
 	"gorm.io/plugin/soft_delete"
 	"strconv"
 )
@@ -51,6 +51,10 @@ type TaskModel struct {
 	AllowMaxRunTimes int
 	MaxRunTimeSec int
 	CallbackPath string
+}
+
+func (*TaskModel) TableName() string {
+	return "task"
 }
 
 func (t *TaskModel) toEntity(callbackSrv *task.TaskCallbackSrv) (*task.Task, error) {
@@ -120,6 +124,10 @@ type TaskCallbackSrvModel struct {
 	HasEnableHealthCheck bool
 }
 
+func (*TaskCallbackSrvModel) TableName() string {
+	return "task_callback_srv"
+}
+
 func (m *TaskCallbackSrvModel) toEntity(routes []*task.TaskCallbackSrvRoute) *task.TaskCallbackSrv {
 	return task.NewTaskCallbackSrv(m.toEntityId(), m.Name, routes, m.HasEnableHealthCheck)
 }
@@ -146,6 +154,11 @@ type TaskCallbackSrvRouteModel struct {
 	CheckedHealthAt int64
 	EnableHealthCheck bool
 }
+
+func (*TaskCallbackSrvRouteModel) TableName() string {
+	return "task_callback_srv_route"
+}
+
 
 func toTackCallbackSrvRouteModelId(entityId string) (uint64, error) {
 	return strconv.ParseUint(entityId, 10, 64)
@@ -183,4 +196,8 @@ type TaskLogModel struct {
 	IsRunInAsync bool `json:"is_run_in_async"`
 	RespExtra field.Json `json:"resp_extra"`
 	TryTimes int `json:"try_times"`
+}
+
+func (*TaskLogModel) TableName() string {
+	return "task_log"
 }

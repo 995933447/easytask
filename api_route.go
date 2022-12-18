@@ -4,12 +4,12 @@ import (
 	"github.com/995933447/easytask/internal/apihandler"
 	"github.com/995933447/easytask/internal/apiserver"
 	"github.com/995933447/easytask/internal/registry"
-	"github.com/995933447/easytask/internal/repo"
+	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
 	"net/http"
 )
 
-func getHttpApiRoutes(taskRepo repo.TaskRepo, reg *registry.Registry) []*apiserver.HttpRoute {
+func getHttpApiRoutes(taskRepo task.TaskRepo, reg *registry.Registry) []*apiserver.HttpRoute {
 	var (
 		taskSrv = apihandler.NewTaskService(taskRepo, reg)
 		registrySrv = apihandler.NewRegistryService(reg)

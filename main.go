@@ -2,19 +2,18 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/995933447/autoelect"
 	electfactory "github.com/995933447/autoelect/factory"
 	"github.com/995933447/confloader"
 	distribmufactory "github.com/995933447/distribmu/factory"
 	"github.com/995933447/easytask/internal/apiserver"
-	callbacksrvexecimpl "github.com/995933447/easytask/internal/callbacksrvexec/impl"
 	"github.com/995933447/easytask/internal/registry"
-	"github.com/995933447/easytask/internal/repo"
-	mysqlrepo "github.com/995933447/easytask/internal/repo/impl/mysql"
-	"github.com/995933447/easytask/internal/sched"
 	"github.com/995933447/easytask/internal/task"
+	"github.com/995933447/easytask/internal/task/impl/callbackexec"
+	mysqlrepo "github.com/995933447/easytask/internal/task/impl/repo/mysql"
 	"github.com/995933447/easytask/internal/util/logger"
-	"github.com/995933447/easytask/pkg/contx"
+	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/995933447/log-go"
 	"github.com/995933447/redisgroup"
 	"github.com/995933447/std-go/scan"
@@ -68,9 +67,9 @@ type Conf struct {
 }
 
 func main() {
-	ctx := contx.New("main", context.TODO())
+	ctx := contxt.New("main", context.TODO())
 
-	conf, errDuringWatchConf, err := loadConf(ctx)
+	conf, errDuringWatchConf, err := loadConf()
 	if err != nil {
 		panic(any(err))
 	}
@@ -79,7 +78,7 @@ func main() {
 
 	defer recoverPanic(ctx)
 
-	elect, errDuringElect, err := startElect(ctx, conf)
+	elect, errDuringElect, err := startElect(contxt.ChildOf(ctx), conf)
 	if err != nil {
 		panic(any(err))
 	}
@@ -95,14 +94,14 @@ func main() {
 		}
 	}()
 
-	taskRepo, taskCallbackSrvRepo, err := NewRepos(ctx, conf)
+	taskRepo, taskCallbackSrvRepo, err := NewRepos(contxt.ChildOf(ctx), conf)
 	if err != nil {
 		panic(any(err))
 	}
 
-	reg := runRegistry(ctx, conf, taskCallbackSrvRepo, elect)
+	reg := runRegistry(contxt.ChildOf(ctx), conf, taskCallbackSrvRepo, elect)
 
-	runTaskWorker(ctx, conf, taskRepo, elect)
+	runTaskWorker(contxt.ChildOf(ctx), conf, taskRepo, elect)
 
 	signCh := make(chan os.Signal)
 	go func() {
@@ -114,18 +113,20 @@ func main() {
 	}()
 	signal.Notify(signCh, syscall.SIGINT, syscall.SIGTERM)
 
-	if err = runHttpApiServer(ctx, conf, taskRepo, reg); err != nil {
+	if err = runHttpApiServer(contxt.ChildOf(ctx), conf, taskRepo, reg); err != nil {
 		panic(any(err))
 	}
 }
 
 func recoverPanic(ctx context.Context) {
 	if err := recover(); err != nil {
+		fmt.Println(err)
 		logger.MustGetSysLogger().Errorf(ctx, "PROCESS PANIC: err %s", err)
 		stack := debug.Stack()
 		if len(stack) > 0 {
 			lines := strings.Split(string(stack), "\n")
 			for _, line := range lines {
+				fmt.Println(line)
 				logger.MustGetSysLogger().Error(ctx, line)
 			}
 		}
@@ -134,12 +135,11 @@ func recoverPanic(ctx context.Context) {
 	}
 }
 
-func loadConf(ctx context.Context) (*Conf, chan error, error) {
+func loadConf() (*Conf, chan error, error) {
 	confFile := scan.OptStr("c")
 	var conf Conf
 	confLoader := confloader.NewLoader(confFile, 3, &conf)
 	if err := confLoader.Load(); err != nil {
-		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, nil, err
 	}
 	errCh := make(chan error)
@@ -180,15 +180,14 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, chan e
 		for _, nodeConf := range conf.RedisConf.Nodes {
 			nodes = append(nodes, redisgroup.NewNode(nodeConf.Host, nodeConf.Port, nodeConf.Password))
 		}
-		redisGroup := redisgroup.NewGroup(nodes, logger.MustGetSysLogger().(*log.Logger))
-
+		redis := redisgroup.NewGroup(nodes, logger.MustGetElectLogger().(*log.Logger))
 		elect, err = electfactory.NewAutoElection(
 			electfactory.ElectDriverGitDistribMu,
 			electfactory.NewDistribMuElectDriverConf(
 				conf.ClusterName,
 				time.Second * 5,
 				distribmufactory.MuTypeRedis,
-				distribmufactory.NewRedisMuDriverConf(redisGroup, 500),
+				distribmufactory.NewRedisMuDriverConf(redis, 500),
 			),
 		)
 		if err != nil {
@@ -199,60 +198,60 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, chan e
 
 	errDuringLoopCh := make(chan error)
 	go func() {
-		if err = elect.LoopInElect(ctx, errDuringLoopCh); err != nil {
+		if err = elect.LoopInElect(contxt.ChildOf(ctx), errDuringLoopCh); err != nil {
 			logger.MustGetSysLogger().Error(ctx, err)
 			errDuringLoopCh <- err
 		}
 	}()
 
-	return nil, errDuringLoopCh, nil
+	return elect, errDuringLoopCh, nil
 }
 
-func runRegistry(ctx context.Context, conf *Conf, taskCallbackSrvRepo repo.TaskCallbackSrvRepo, elect autoelect.AutoElection) *registry.Registry {
+func runRegistry(ctx context.Context, conf *Conf, taskCallbackSrvRepo task.TaskCallbackSrvRepo, elect autoelect.AutoElection) *registry.Registry {
 	reg := registry.NewRegistry(
 		conf.IsClusterMode,
 		conf.HealthCheckWorkerPoolSize,
 		taskCallbackSrvRepo,
-		callbacksrvexecimpl.NewHttpExec(),
+		callbackexec.NewHttpExec(),
 		elect,
 		)
-	go reg.Run(ctx)
+	go reg.Run(contxt.ChildOf(ctx))
 	return reg
 }
 
-func NewRepos(ctx context.Context, conf *Conf) (repo.TaskRepo, repo.TaskCallbackSrvRepo, error) {
+func NewRepos(ctx context.Context, conf *Conf) (task.TaskRepo, task.TaskCallbackSrvRepo, error) {
 	var (
-		taskRepo repo.TaskRepo
-		taskCallbackSrvRepo repo.TaskCallbackSrvRepo
-		err error
+		taskRepo            task.TaskRepo
+		taskCallbackSrvRepo task.TaskCallbackSrvRepo
+		err                 error
 	)
-	if taskCallbackSrvRepo, err = mysqlrepo.NewTaskSrvRepo(ctx, conf.MysqlConf.ConnDsn); err != nil {
+	if taskCallbackSrvRepo, err = mysqlrepo.NewTaskSrvRepo(contxt.ChildOf(ctx), conf.MysqlConf.ConnDsn); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, nil, err
 	}
-	if taskRepo, err = mysqlrepo.NewTaskRepo(ctx, conf.MysqlConf.ConnDsn, taskCallbackSrvRepo); err != nil {
+	if taskRepo, err = mysqlrepo.NewTaskRepo(contxt.ChildOf(ctx), conf.MysqlConf.ConnDsn, taskCallbackSrvRepo); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, nil, err
 	}
 	return taskRepo, taskCallbackSrvRepo, nil
 }
 
-func runTaskWorker(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, elect autoelect.AutoElection) {
+func runTaskWorker(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, elect autoelect.AutoElection) {
 	engine :=  task.NewWorkerEngine(
 		conf.TaskWorkerPoolSize,
-		sched.NewSched(conf.IsClusterMode, taskRepo, elect),
-		callbacksrvexecimpl.NewHttpExec(),
+		task.NewSched(conf.IsClusterMode, taskRepo, elect),
+		callbackexec.NewHttpExec(),
 		)
-	go engine.Run(ctx)
+	go engine.Run(contxt.ChildOf(ctx))
 }
 
-func runHttpApiServer(ctx context.Context, conf *Conf, taskRepo repo.TaskRepo, reg *registry.Registry) error {
+func runHttpApiServer(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, reg *registry.Registry) error {
 	router := apiserver.NewHttpRouter(conf.HttpApiSrvConf.Host, conf.HttpApiSrvConf.Port)
-	if err := router.RegisterBatch(ctx, getHttpApiRoutes(taskRepo, reg)); err != nil {
+	if err := router.RegisterBatch(contxt.ChildOf(ctx), getHttpApiRoutes(taskRepo, reg)); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}
-	if err := router.Boot(ctx); err != nil {
+	if err := router.Boot(contxt.ChildOf(ctx)); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}

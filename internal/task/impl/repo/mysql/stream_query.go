@@ -31,7 +31,7 @@ func (q *OptStreamQuery) Hit(ctx context.Context, limit, offset int64, list inte
 	if offset > 0 {
 		db.Limit(int(offset))
 	}
-	if err := db.Scan(list).Error; err != nil {
+	if err := db.Find(list).Error; err != nil {
 		log.Error(ctx, err)
 		return 0, err
 	}
@@ -46,7 +46,7 @@ func (q *OptStreamQuery) Query(ctx context.Context, limit, offset int64, list in
 	if offset > 0 {
 		db.Limit(int(offset))
 	}
-	if err := db.Scan(list).Error; err != nil {
+	if err := db.Find(list).Error; err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}

@@ -3,11 +3,10 @@ package registry
 import (
 	"context"
 	"github.com/995933447/autoelect"
-	"github.com/995933447/easytask/internal/callbacksrvexec"
-	"github.com/995933447/easytask/internal/repo"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/errs"
 	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/995933447/optionstream"
 	"time"
 )
@@ -17,20 +16,20 @@ const (
 )
 
 type Registry struct {
-	checkHealthIntervalSec int64
+	checkHealthIntervalSec    int64
 	checkHealthWorkerPoolSize uint
-	srvRepo repo.TaskCallbackSrvRepo
-	callbackSrvExec callbacksrvexec.TaskCallbackSrvExec
-	readyCheckSrvChan chan *task.TaskCallbackSrv
-	elect autoelect.AutoElection
-	isClusterMode bool
+	srvRepo                   task.TaskCallbackSrvRepo
+	callbackSrvExec           task.TaskCallbackSrvExec
+	readyCheckSrvChan         chan *task.TaskCallbackSrv
+	elect                     autoelect.AutoElection
+	isClusterMode             bool
 }
 
 func NewRegistry(
 	isClusterMode bool,
 	checkHealthWorkerPoolSize uint,
-	srvRepo repo.TaskCallbackSrvRepo,
-	callbackSrvExec callbacksrvexec.TaskCallbackSrvExec,
+	srvRepo task.TaskCallbackSrvRepo,
+	callbackSrvExec task.TaskCallbackSrvExec,
 	elect autoelect.AutoElection,
 	) *Registry {
 	if checkHealthWorkerPoolSize == 0 {
@@ -47,11 +46,11 @@ func NewRegistry(
 }
 
 func (r *Registry) Discover(ctx context.Context, srvName string) (*task.TaskCallbackSrv, error) {
-	log := logger.MustGetSysLogger()
+	log := logger.MustGetRegistryLogger()
 
 	srvs, err := r.srvRepo.GetSrvs(
-		ctx,
-		optionstream.NewQueryStream(nil, 1, 0).SetOption(repo.QueryOptKeyEqName, srvName),
+		contxt.ChildOf(ctx),
+		optionstream.NewQueryStream(nil, 1, 0).SetOption(task.QueryOptKeyEqName, srvName),
 	)
 	if err != nil {
 		log.Error(ctx, err)
@@ -68,8 +67,8 @@ func (r *Registry) Discover(ctx context.Context, srvName string) (*task.TaskCall
 
 // 注册路由，如果服务名称已经存在，则增量添加路由
 func (r *Registry) Register(ctx context.Context, srv *task.TaskCallbackSrv) error {
-	if err := r.srvRepo.AddSrvRoutes(ctx, srv); err != nil {
-		logger.MustGetSysLogger().Error(ctx, err)
+	if err := r.srvRepo.AddSrvRoutes(contxt.ChildOf(ctx), srv); err != nil {
+		logger.MustGetRegistryLogger().Error(ctx, err)
 		return err
 	}
 	return nil
@@ -77,8 +76,8 @@ func (r *Registry) Register(ctx context.Context, srv *task.TaskCallbackSrv) erro
 
 // 删除路由
 func (r *Registry) Unregister(ctx context.Context, srv *task.TaskCallbackSrv) error {
-	if err := r.srvRepo.DelSrvRoutes(ctx, srv); err != nil {
-		logger.MustGetSysLogger().Error(ctx, err)
+	if err := r.srvRepo.DelSrvRoutes(contxt.ChildOf(ctx), srv); err != nil {
+		logger.MustGetRegistryLogger().Error(ctx, err)
 		return err
 	}
 	return nil
@@ -87,17 +86,17 @@ func (r *Registry) Unregister(ctx context.Context, srv *task.TaskCallbackSrv) er
 func (r *Registry) HeathCheck(ctx context.Context) error {
 	if r.isClusterMode && !r.elect.IsMaster() {
 		err := errs.ErrCurrentNodeNoMaster
-		logger.MustGetSysLogger().Error(ctx, err)
+		logger.MustGetRegistryLogger().Error(ctx, err)
 		return err
 	}
 
 	queryStream := optionstream.NewQueryStream(nil, 1000, 0).
-		SetOption(repo.QueryOptKeyCheckedHealthLt, time.Now().Unix() - r.checkHealthIntervalSec).
-		SetOption(repo.QueryOptKeyEnabledHeathCheck, nil)
+		SetOption(task.QueryOptKeyCheckedHealthLt, time.Now().Unix() - r.checkHealthIntervalSec).
+		SetOption(task.QueryOptKeyEnabledHeathCheck, nil)
 	for {
-		srvs, err := r.srvRepo.GetSrvs(ctx, queryStream)
+		srvs, err := r.srvRepo.GetSrvs(contxt.ChildOf(ctx), queryStream)
 		if err != nil {
-			logger.MustGetSysLogger().Error(ctx, err)
+			logger.MustGetRegistryLogger().Error(ctx, err)
 			return err
 		}
 
@@ -114,14 +113,14 @@ func (r *Registry) HeathCheck(ctx context.Context) error {
 }
 
 func (r *Registry) Run(ctx context.Context) {
-	go r.createHealthCheckWorkerPool(ctx)
-	go r.sched(ctx)
+	go r.createHealthCheckWorkerPool(contxt.ChildOf(ctx))
+	go r.sched(contxt.ChildOf(ctx))
 }
 
 func (r *Registry) sched(ctx context.Context) {
 	for {
-		if err := r.HeathCheck(ctx); err != nil {
-			logger.MustGetSysLogger().Error(ctx, err)
+		if err := r.HeathCheck(contxt.ChildOf(ctx)); err != nil {
+			logger.MustGetRegistryLogger().Error(ctx, err)
 		}
 		time.Sleep(time.Duration(r.checkHealthIntervalSec) * time.Second)
 	}
@@ -134,7 +133,7 @@ func (r *Registry) createHealthCheckWorkerPool(ctx context.Context) {
 		withReplyRouteSrvCh = make(chan *task.TaskCallbackSrv)
 	)
 	for ; i < r.checkHealthWorkerPoolSize; i++ {
-		go r.runWorker(ctx, withReplyRouteSrvCh, withNoReplyRouteSrvCh)
+		go r.runWorker(contxt.ChildOf(ctx), withReplyRouteSrvCh, withNoReplyRouteSrvCh)
 	}
 
 	for {
@@ -158,8 +157,8 @@ func (r *Registry) createHealthCheckWorkerPool(ctx context.Context) {
 				}
 			}
 			for _, srv := range withNoReplyRouteSrvs {
-				if err := r.srvRepo.DelSrvRoutes(ctx, srv); err != nil {
-					logger.MustGetSysLogger().Error(ctx, err)
+				if err := r.srvRepo.DelSrvRoutes(contxt.ChildOf(ctx), srv); err != nil {
+					logger.MustGetRegistryLogger().Error(ctx, err)
 				}
 			}
 		case withReplyRouteSrv := <- withReplyRouteSrvCh:
@@ -178,8 +177,8 @@ func (r *Registry) createHealthCheckWorkerPool(ctx context.Context) {
 			}
 
 			for _, srv := range withReplyRouteSrvs {
-				if err := r.srvRepo.SetSrvRoutesPassHealthCheck(ctx, srv); err != nil {
-					logger.MustGetSysLogger().Error(ctx, err)
+				if err := r.srvRepo.SetSrvRoutesPassHealthCheck(contxt.ChildOf(ctx), srv); err != nil {
+					logger.MustGetRegistryLogger().Error(ctx, err)
 				}
 			}
 		}
@@ -188,9 +187,9 @@ func (r *Registry) createHealthCheckWorkerPool(ctx context.Context) {
 
 func (r *Registry) runWorker(ctx context.Context, withNoReplyRouteSrvCh, withReplyRouteSrvCh chan *task.TaskCallbackSrv) {
 	srv := <- r.readyCheckSrvChan
-	heatBeatResp, err := r.callbackSrvExec.HeartBeat(ctx, srv)
+	heatBeatResp, err := r.callbackSrvExec.HeartBeat(contxt.ChildOf(ctx), srv)
 	if err != nil {
-		logger.MustGetSysLogger().Error(ctx, err)
+		logger.MustGetRegistryLogger().Error(ctx, err)
 		return
 	}
 	withNoReplyRouteSrvCh <- task.NewTaskCallbackSrv(srv.GetId(), srv.GetName(), heatBeatResp.GetNoReplyRoutes(), true)

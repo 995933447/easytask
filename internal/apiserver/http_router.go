@@ -59,14 +59,14 @@ func (r *HttpRouter) Register(ctx context.Context, route *HttpRoute) error {
 	}
 
 	handlerType := reflect.TypeOf(route.Handler)
-	errInvalidHandler := errors.New("handler must be implements func(api.*Context, *req)) (*resp, error)")
+	errInvalidHandler := errors.New("handler must be implements func(context.Context, *req)) (*resp, error)")
 
 	if handlerType.NumIn() != 2 || handlerType.NumOut() != 2 {
 		log.Error(ctx, errInvalidHandler)
 		return errInvalidHandler
 	}
 
-	if _, ok := reflect.New(handlerType.In(0)).Interface().(context.Context); !ok {
+	if _, ok := reflect.New(handlerType.In(0)).Interface().(*context.Context); !ok {
 		log.Error(ctx, errInvalidHandler)
 		return errInvalidHandler
 	}
@@ -87,7 +87,7 @@ func (r *HttpRouter) Register(ctx context.Context, route *HttpRoute) error {
 		}
 	}
 
-	if _, ok := reflect.New(handlerType.Out(1)).Interface().(error); !ok {
+	if _, ok := reflect.New(handlerType.Out(1)).Interface().(*error); !ok {
 		log.Error(ctx, errInvalidHandler)
 		return errInvalidHandler
 	}
@@ -140,7 +140,7 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 		srvMux.HandleFunc(path, func(writer http.ResponseWriter, req *http.Request) {
 			traceId := req.Header.Get(httpproto.HeaderSimpleTraceId)
 			spanId := req.Header.Get(httpproto.HeaderSimpleTraceSpanId)
-			ctx := contx.ChildOf(contx.NewWithTrace("api", req.Context(), traceId, spanId))
+			ctx := contxt.ChildOf(contxt.NewWithTrace("api", req.Context(), traceId, spanId))
 
 			handlerReflec, ok := methodToHandlerMap[req.Method]
 			if !ok {
