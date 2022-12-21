@@ -146,7 +146,7 @@ func toTaskCallbackSrvModelId(entity *task.TaskCallbackSrv) (uint64, error) {
 
 type TaskCallbackSrvRouteModel struct {
 	BaseModel
-	Schema string
+	SrvSchema string
 	Host string
 	Port int
 	SrvId uint64
@@ -179,7 +179,7 @@ func toCallbackSrvRouteModelId(entityId string) (uint64, error) {
 func (m *TaskCallbackSrvRouteModel) toEntity() *task.TaskCallbackSrvRoute {
 	return task.NewTaskCallbackSrvRoute(
 		m.toEntityId(),
-		m.Schema,
+		m.SrvSchema,
 		m.Host,
 		m.Port,
 		m.CallbackTimeoutSec,
@@ -195,7 +195,7 @@ type TaskLogModel struct {
 	TaskStatus int `json:"task_status"`
 	IsRunInAsync bool `json:"is_run_in_async"`
 	RespExtra field.Json `json:"resp_extra"`
-	TryTimes int `json:"try_times"`
+	RunTimes int `json:"try_times"`
 }
 
 func (*TaskLogModel) TableName() string {

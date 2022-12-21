@@ -1,9 +1,9 @@
 package httpproto
 
 const (
-	AddTaskCmdPath = "/task"
-	DelTaskCmdPath = "/task/del"
-	ConfirmTaskCmdPath = "task/confirm"
-	RegisterTaskCallbackSrvCmdPath = "/task/server"
-	UnregisterTaskCallbackSrvCmdPath = "/task/server/del"
+	AddTaskCmdPath = "/add_task"
+	StopTaskCmdPath = "/stop_task"
+	ConfirmTaskCmdPath = "/confirm_task"
+	RegisterTaskCallbackSrvCmdPath = "/add_task_server"
+	UnregisterTaskCallbackSrvCmdPath = "/del_task_server"
 )

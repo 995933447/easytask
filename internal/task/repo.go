@@ -6,7 +6,7 @@ import (
 )
 
 type TaskRepo interface {
-	TimeoutTasks(ctx context.Context, size int) ([]*Task, error)
+	TimeoutTasks(ctx context.Context, size int, cursor string) (tasks []*Task, nextCursor string, err error)
 	LockTask(context.Context, *Task) (bool, error)
 	ConfirmTasks(context.Context, []*TaskResp) error
 	ConfirmTask(context.Context, *TaskResp) error

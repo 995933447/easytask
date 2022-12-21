@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/easytask/pkg/contxt"
+	"github.com/995933447/simpletrace"
+	simpletracectx "github.com/995933447/simpletrace/context"
 	"time"
 )
 
@@ -35,34 +37,67 @@ func (e *workerEngine) Run(ctx context.Context) {
 }
 
 func (e *workerEngine) createWorkerPool(ctx context.Context) {
+	logger.MustGetSysLogger().Info(ctx, "start create worker pool")
 	var i uint
 	for ; i < e.workerPoolSize; i++ {
-		taskIn := make(chan *Task)
-		go e.runWorker(ctx, taskIn, i)
+		go e.runWorker(ctx, i)
+		logger.MustGetSysLogger().Infof(ctx, "task worker(id:%d) running", i)
 	}
+	logger.MustGetSysLogger().Info(ctx, "created worker pool")
 }
 
-func (e *workerEngine) runWorker(ctx context.Context, taskIn chan *Task, workerId uint) {
-	log := logger.MustGetTaskLogger()
+func (e *workerEngine) runWorker(ctx context.Context, workerId uint) {
+	var (
+		traceModule = "task_worker"
+		origCtxTraceId string
+		log = logger.MustGetTaskLogger()
+	)
+	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
+		origCtxTraceId = traceCtx.GetTraceId()
+	}
 	for {
-		e.sched.TaskWorkerReady(taskIn)
-		ctx = contxt.ChildOf(ctx)
-		log.Infof(ctx, "worker:%d is ready", workerId)
-		task := <- taskIn
+		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
+
+		log.Infof(ctx, "worker(id:%d) is ready", workerId)
+
+		task := e.sched.NextTask()
+
+		if len(task.callbackSrv.GetRoutes()) == 0 {
+			log.Warnf(
+				ctx,
+				"task(id:%s, name:%s) callback server(name:%s) has no routes",
+				task.id, task.name, task.callbackSrv.name,
+			)
+			return
+		}
+
+		log.Infof(ctx, "worker(id:%d) run task(id:%s name:%s)", workerId, task.id, task.name)
+
+		now := time.Now()
+
 		locked, err := e.sched.LockTaskForRun(contxt.ChildOf(ctx), task)
 		if err != nil {
 			log.Error(ctx, err)
 			return
 		}
+
 		if !locked {
-			log.Warnf(ctx, "lock task(id:%s) failed", task.id)
+			log.Warnf(ctx, "worker(id:%d) lock task(id:%s) failed", workerId, task.id)
 			return
 		}
+
 		taskResp, err := task.run(contxt.ChildOf(ctx), e.callbackTaskSrvExec)
 		if err != nil {
 			log.Error(ctx, err)
-			taskResp = newInternalErrTaskResp(task.id, err, time.Now().Unix())
+			taskResp = newInternalErrTaskResp(task.id, err, now.Unix())
 		}
+
+		log.Infof(
+			ctx,
+			"worker(id:%d) finish task(id:%s name:%s), exec time:%d ms",
+			workerId, task.id, task.name, time.Now().Sub(now) / time.Millisecond,
+			)
+
 		e.sched.SubmitTaskResp(taskResp)
 	}
 }

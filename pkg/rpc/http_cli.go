@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/995933447/easytask/pkg/contx"
+	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
 	simpletracectx "github.com/995933447/simpletrace/context"
 	"io"
@@ -22,17 +22,17 @@ var TimeoutOpt = func(timeout time.Duration) HttpReqOpt {
 	}
 }
 
-type HttpRpc struct {
+type HttpCli struct {
 	apiSrvAddr string
 }
 
-func NewHttpRpc(apiSrvAddr string) *HttpRpc {
-	return &HttpRpc{
+func NewHttpCli(apiSrvAddr string) *HttpCli {
+	return &HttpCli{
 		apiSrvAddr: strings.TrimRight(apiSrvAddr, "/"),
 	}
 }
 
-func (c *HttpRpc) AddTask(ctx context.Context, req *httpproto.AddTaskReq, opts ...HttpReqOpt) (*httpproto.AddTaskResp, error) {
+func (c *HttpCli) AddTask(ctx context.Context, req *httpproto.AddTaskReq, opts ...HttpReqOpt) (*httpproto.AddTaskResp, error) {
 	var resp httpproto.AddTaskResp
 	err := c.post(contxt.New("api", ctx), httpproto.AddTaskCmdPath, req, &resp, opts...)
 	if err != nil {
@@ -41,16 +41,16 @@ func (c *HttpRpc) AddTask(ctx context.Context, req *httpproto.AddTaskReq, opts .
 	return &resp, nil
 }
 
-func (c *HttpRpc) DelTask(ctx context.Context, req *httpproto.DelTaskReq, opts ...HttpReqOpt) (*httpproto.DelTaskResp, error) {
-	var resp httpproto.DelTaskResp
-	err := c.post(contxt.New("api", ctx), httpproto.DelTaskCmdPath, req, &resp, opts...)
+func (c *HttpCli) StopTask(ctx context.Context, req *httpproto.StopTaskReq, opts ...HttpReqOpt) (*httpproto.StopTaskResp, error) {
+	var resp httpproto.StopTaskResp
+	err := c.post(contxt.New("api", ctx), httpproto.StopTaskCmdPath, req, &resp, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *HttpRpc) ConfirmTask(ctx context.Context, req *httpproto.ConfirmTaskReq, opts ...HttpReqOpt) (*httpproto.ConfirmTaskResp, error) {
+func (c *HttpCli) ConfirmTask(ctx context.Context, req *httpproto.ConfirmTaskReq, opts ...HttpReqOpt) (*httpproto.ConfirmTaskResp, error) {
 	var resp httpproto.ConfirmTaskResp
 	err := c.post(contxt.New("api", ctx), httpproto.ConfirmTaskCmdPath, req, &resp, opts...)
 	if err != nil {
@@ -59,7 +59,7 @@ func (c *HttpRpc) ConfirmTask(ctx context.Context, req *httpproto.ConfirmTaskReq
 	return &resp, nil
 }
 
-func (c *HttpRpc) RegisterTaskCallbackSrv(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq, opts ...HttpReqOpt) (*httpproto.RegisterTaskCallbackSrvResp, error) {
+func (c *HttpCli) RegisterTaskCallbackSrv(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq, opts ...HttpReqOpt) (*httpproto.RegisterTaskCallbackSrvResp, error) {
 	var resp httpproto.RegisterTaskCallbackSrvResp
 	err := c.post(contxt.New("api", ctx), httpproto.RegisterTaskCallbackSrvCmdPath, req, &resp, opts...)
 	if err != nil {
@@ -68,7 +68,7 @@ func (c *HttpRpc) RegisterTaskCallbackSrv(ctx context.Context, req *httpproto.Re
 	return &resp, nil
 }
 
-func (c *HttpRpc) UnregisterTaskCallbackSrv(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq, opts ...HttpReqOpt) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
+func (c *HttpCli) UnregisterTaskCallbackSrv(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq, opts ...HttpReqOpt) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
 	var resp httpproto.UnregisterTaskCallbackSrvResp
 	err := c.post(contxt.New("api", ctx), httpproto.UnregisterTaskCallbackSrvCmdPath, req, &resp, opts...)
 	if err != nil {
@@ -77,7 +77,7 @@ func (c *HttpRpc) UnregisterTaskCallbackSrv(ctx context.Context, req *httpproto.
 	return &resp, nil
 }
 
-func (c *HttpRpc) post(ctx context.Context, path string, req, resp any, opts ...HttpReqOpt) error {
+func (c *HttpCli) post(ctx context.Context, path string, req, resp any, opts ...HttpReqOpt) error {
 	httpReqBody, err := json.Marshal(req)
 	if err != nil {
 		return err

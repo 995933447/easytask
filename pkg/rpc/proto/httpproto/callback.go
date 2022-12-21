@@ -15,7 +15,7 @@ type TaskCallbackReq struct {
 	Cmd int `json:"cmd"`
 	TaskName string `json:"task_name"`
 	Arg      []byte `json:"arg"`
-	RunTimes int    `json:"tried_cnt"`
+	RunTimes int    `json:"run_times"`
 }
 
 type HeartBeatResp struct {

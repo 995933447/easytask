@@ -50,7 +50,7 @@ func (r *HeartBeatResp) GetReplyRoutes() []*TaskCallbackSrvRoute {
 
 func NewHeartBeatResp(replyRoutes, noReplyRoutes []*TaskCallbackSrvRoute) *HeartBeatResp {
 	 return &HeartBeatResp{
-		 noReplyRoutes: replyRoutes,
-		 replyRoutes: noReplyRoutes,
+		 noReplyRoutes: noReplyRoutes,
+		 replyRoutes: replyRoutes,
 	 }
 }

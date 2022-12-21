@@ -7,11 +7,12 @@ import (
 	"fmt"
 	internalerr "github.com/995933447/easytask/internal/util/errs"
 	"github.com/995933447/easytask/internal/util/logger"
-	"github.com/995933447/easytask/pkg/contx"
+	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/995933447/easytask/pkg/errs"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
-	"github.com/ggicci/httpin"
+	simpletracectx "github.com/995933447/simpletrace/context"
 	"github.com/go-playground/validator"
+	"io"
 	"net/http"
 	"reflect"
 	"sync"
@@ -128,8 +129,8 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 		}
 	}()
 
-	respErr := func(ctx context.Context, writer http.ResponseWriter, errCode errs.ErrCode) {
-		if err := r.writeResp(ctx, writer, 200, []byte(errs.GetErrMsg(errCode)), nil); err != nil {
+	respErr := func(ctx context.Context, writer http.ResponseWriter, errCode errs.ErrCode, header map[string]string) {
+		if err := r.writeResp(ctx, writer, 200, []byte(errs.GetErrMsg(errCode)), header); err != nil {
 			logger.MustGetSessLogger().Error(ctx, err)
 		}
 	}
@@ -137,52 +138,83 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 	srvMux := http.NewServeMux()
 
 	for path, methodToHandlerMap := range r.routeMap {
-		srvMux.HandleFunc(path, func(writer http.ResponseWriter, req *http.Request) {
-			traceId := req.Header.Get(httpproto.HeaderSimpleTraceId)
-			spanId := req.Header.Get(httpproto.HeaderSimpleTraceSpanId)
-			ctx := contxt.ChildOf(contxt.NewWithTrace("api", req.Context(), traceId, spanId))
-
-			handlerReflec, ok := methodToHandlerMap[req.Method]
-			if !ok {
-				respErr(ctx, writer, errs.ErrCodeRouteMethodNotAllow)
-				return
-			}
-
-			argsVal := req.Context().Value(httpin.Input)
-
-			if !reflect.TypeOf(argsVal).Elem().ConvertibleTo(handlerReflec.req) {
-				respErr(ctx, writer, errs.ErrCodeArgsInvalid)
-				return
-			}
-
-			handleReq := reflect.ValueOf(argsVal).Elem().Convert(handlerReflec.req)
-
-			replies := handlerReflec.handler.Call([]reflect.Value{reflect.ValueOf(ctx), handleReq})
-			err := replies[1].Interface().(error)
-			if err != nil {
-				logger.MustGetSessLogger().Error(ctx, err)
-				respErr(ctx, writer, errs.ErrCodeInternal)
-				return
-			}
-
-			resp := replies[0].Interface()
-			respJson, err := json.Marshal(resp)
-			if err != nil {
-				logger.MustGetSessLogger().Error(ctx, err)
-				if handleErr, ok := err.(*HandleErr); ok {
-					respErr(ctx, writer, handleErr.errCode)
+		func(path string, methodToHandlerMap map[string]*handlerReflect) {
+			srvMux.HandleFunc(path, func(writer http.ResponseWriter, req *http.Request) {
+				var (
+					ctx context.Context
+					traceId = req.Header.Get(httpproto.HeaderSimpleTraceId)
+					spanId = req.Header.Get(httpproto.HeaderSimpleTraceSpanId)
+					parentSpanId = req.Header.Get(httpproto.HeaderSimpleTraceParentSpanId)
+					traceModule = "api"
+				)
+				if traceId != "" {
+					ctx = contxt.NewWithTrace(
+						traceModule,
+						contxt.NewWithTrace(traceModule, req.Context(), traceId, parentSpanId),
+						traceId,
+						spanId,
+						)
 				} else {
-					respErr(ctx, writer, errs.ErrCodeInternal)
+					ctx = contxt.New(traceModule, req.Context())
 				}
-				return
-			}
 
-			err = r.writeResp(ctx, writer, 200, respJson, map[string]string{"Content-Type": "application/json"})
-			if err != nil {
-				logger.MustGetSessLogger().Error(ctx, err)
-				return
-			}
-		})
+				respHeader := map[string]string{
+					"Content-Type": "application/json",
+				}
+				if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
+					respHeader[httpproto.HeaderSimpleTraceId] = traceCtx.GetTraceId()
+					respHeader[httpproto.HeaderSimpleTraceSpanId] = traceCtx.GetSpanId()
+					respHeader[httpproto.HeaderSimpleTraceParentSpanId] = traceCtx.GetParentSpanId()
+				}
+
+				logger.MustGetSessLogger().Debugf(ctx, "access path:%s", path)
+
+				handlerReflec, ok := methodToHandlerMap[req.Method]
+				if !ok {
+					respErr(ctx, writer, errs.ErrCodeRouteMethodNotAllow, respHeader)
+					return
+				}
+
+				httpBody, err := io.ReadAll(req.Body)
+				if err != nil {
+					respErr(ctx, writer, errs.ErrCodeArgsInvalid, respHeader)
+					return
+				}
+
+				handleReq := reflect.New(handlerReflec.req)
+				err = json.Unmarshal(httpBody, handleReq.Interface())
+				if err != nil {
+					respErr(ctx, writer, errs.ErrCodeArgsInvalid, respHeader)
+					return
+				}
+
+				replies := handlerReflec.handler.Call([]reflect.Value{reflect.ValueOf(ctx), handleReq})
+				replyErr := replies[1].Interface()
+				if replyErr != nil {
+					logger.MustGetSessLogger().Error(ctx, replyErr)
+					respErr(ctx, writer, errs.ErrCodeInternal, respHeader)
+					return
+				}
+
+				resp := replies[0].Interface()
+				respJson, err := json.Marshal(resp)
+				if err != nil {
+					logger.MustGetSessLogger().Error(ctx, err)
+					if handleErr, ok := err.(*HandleErr); ok {
+						respErr(ctx, writer, handleErr.errCode, respHeader)
+					} else {
+						respErr(ctx, writer, errs.ErrCodeInternal, respHeader)
+					}
+					return
+				}
+
+				err = r.writeResp(ctx, writer, 200, respJson, respHeader)
+				if err != nil {
+					logger.MustGetSessLogger().Error(ctx, err)
+					return
+				}
+			})
+		} (path, methodToHandlerMap)
 	}
 
 	srv := &http.Server{
@@ -201,6 +233,7 @@ func (r *HttpRouter) writeResp(ctx context.Context, writer http.ResponseWriter, 
 	writer.WriteHeader(code)
 
 	for key, val := range header {
+		logger.MustGetSessLogger().Debugf(ctx, "resp header:%s => %s", key, val)
 		writer.Header().Set(key, val)
 	}
 

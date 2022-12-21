@@ -8,6 +8,8 @@ import (
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/995933447/optionstream"
+	"github.com/995933447/simpletrace"
+	simpletracectx "github.com/995933447/simpletrace/context"
 	"time"
 )
 
@@ -36,10 +38,11 @@ func NewRegistry(
 		checkHealthWorkerPoolSize = DefaultCheckWorkerPoolSize
 	}
 	return &Registry{
+		checkHealthIntervalSec: 5,
 		checkHealthWorkerPoolSize: checkHealthWorkerPoolSize,
 		srvRepo: srvRepo,
 		callbackSrvExec: callbackSrvExec,
-		readyCheckSrvChan: make(chan *task.TaskCallbackSrv),
+		readyCheckSrvChan: make(chan *task.TaskCallbackSrv, 10000),
 		elect: elect,
 		isClusterMode: isClusterMode,
 	}
@@ -90,8 +93,10 @@ func (r *Registry) HeathCheck(ctx context.Context) error {
 		return err
 	}
 
-	queryStream := optionstream.NewQueryStream(nil, 1000, 0).
-		SetOption(task.QueryOptKeyCheckedHealthLt, time.Now().Unix() - r.checkHealthIntervalSec).
+	var(
+		size, offset int64 = 1000, 0
+	)
+	queryStream := optionstream.NewQueryStream(nil, size, offset).
 		SetOption(task.QueryOptKeyEnabledHeathCheck, nil)
 	for {
 		srvs, err := r.srvRepo.GetSrvs(contxt.ChildOf(ctx), queryStream)
@@ -101,9 +106,15 @@ func (r *Registry) HeathCheck(ctx context.Context) error {
 		}
 
 		if len(srvs) == 0 {
+			offset = 0
+			logger.MustGetRegistryLogger().Debug(ctx, "no more servers need checking")
 			break
 		}
 
+		offset += size
+		queryStream.SetOffset(offset)
+
+		logger.MustGetRegistryLogger().Debugf(ctx, "checking servers(len:%d)", len(srvs))
 		for _, srv := range srvs {
 			r.readyCheckSrvChan <- srv
 		}
@@ -118,80 +129,79 @@ func (r *Registry) Run(ctx context.Context) {
 }
 
 func (r *Registry) sched(ctx context.Context) {
+	var (
+		traceModule = "registry_sched"
+		origCtxTraceId string
+		log = logger.MustGetRegistryLogger()
+	)
+	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
+		origCtxTraceId = traceCtx.GetTraceId()
+	}
+
 	for {
+		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
+
+		log.Debug(ctx, "checking health")
+
 		if err := r.HeathCheck(contxt.ChildOf(ctx)); err != nil {
-			logger.MustGetRegistryLogger().Error(ctx, err)
+			log.Error(ctx, err)
 		}
+
+		log.Debug(ctx, "checked health")
+
 		time.Sleep(time.Duration(r.checkHealthIntervalSec) * time.Second)
 	}
 }
 
 func (r *Registry) createHealthCheckWorkerPool(ctx context.Context) {
-	var (
-		i uint
-		withNoReplyRouteSrvCh = make(chan *task.TaskCallbackSrv)
-		withReplyRouteSrvCh = make(chan *task.TaskCallbackSrv)
-	)
+	log := logger.MustGetRegistryLogger()
+	log.Info(ctx, "start create health check worker pool")
+
+	var i uint
 	for ; i < r.checkHealthWorkerPoolSize; i++ {
-		go r.runWorker(contxt.ChildOf(ctx), withReplyRouteSrvCh, withNoReplyRouteSrvCh)
+		go r.runWorker(contxt.ChildOf(ctx))
+		log.Infof(ctx, "worker(id:%d) is running", i)
 	}
 
-	for {
-		var (
-			withNoReplyRouteSrvs []*task.TaskCallbackSrv
-			withReplyRouteSrvs []*task.TaskCallbackSrv
-		)
-		select {
-		case withNoReplyRouteSrv := <- withNoReplyRouteSrvCh:
-			withNoReplyRouteSrvs = append(withNoReplyRouteSrvs, withNoReplyRouteSrv)
-			var noCheckedMoreSrv bool
-			for {
-				select {
-				case withNoReplyRouteSrv = <- withNoReplyRouteSrvCh:
-					withNoReplyRouteSrvs = append(withNoReplyRouteSrvs, withNoReplyRouteSrv)
-				default:
-					noCheckedMoreSrv = true
-				}
-				if noCheckedMoreSrv {
-					break
-				}
-			}
-			for _, srv := range withNoReplyRouteSrvs {
-				if err := r.srvRepo.DelSrvRoutes(contxt.ChildOf(ctx), srv); err != nil {
-					logger.MustGetRegistryLogger().Error(ctx, err)
-				}
-			}
-		case withReplyRouteSrv := <- withReplyRouteSrvCh:
-			withReplyRouteSrvs = append(withReplyRouteSrvs, withReplyRouteSrv)
-			var noCheckedMoreSrv bool
-			for {
-				select {
-				case withReplyRouteSrv = <- withNoReplyRouteSrvCh:
-					withNoReplyRouteSrvs = append(withReplyRouteSrvs, withReplyRouteSrv)
-				default:
-					noCheckedMoreSrv = true
-				}
-				if noCheckedMoreSrv {
-					break
-				}
-			}
+	log.Info(ctx, "finish creating health check worker pool")
+}
 
-			for _, srv := range withReplyRouteSrvs {
-				if err := r.srvRepo.SetSrvRoutesPassHealthCheck(contxt.ChildOf(ctx), srv); err != nil {
-					logger.MustGetRegistryLogger().Error(ctx, err)
-				}
+func (r *Registry) runWorker(ctx context.Context) {
+	var (
+		traceModule = "registry_worker"
+		origCtxTraceId string
+		log = logger.MustGetRegistryLogger()
+	)
+	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
+		origCtxTraceId = traceCtx.GetTraceId()
+	}
+	for {
+		srv := <- r.readyCheckSrvChan
+
+		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
+
+		log.Debugf(ctx, "checking srv(name:%s)", srv.GetName())
+
+		heatBeatResp, err := r.callbackSrvExec.HeartBeat(contxt.ChildOf(ctx), srv)
+		if err != nil {
+			logger.MustGetRegistryLogger().Error(ctx, err)
+			continue
+		}
+
+		replyRoutes := heatBeatResp.GetReplyRoutes()
+		if len(replyRoutes) > 0 {
+			withReplyRouteSrv := task.NewTaskCallbackSrv(srv.GetId(), srv.GetName(), replyRoutes, true)
+			if err := r.srvRepo.SetSrvRoutesPassHealthCheck(contxt.ChildOf(ctx), withReplyRouteSrv); err != nil {
+				log.Error(ctx, err)
+			}
+		}
+
+		noReplyRoutes := heatBeatResp.GetNoReplyRoutes()
+		if len(noReplyRoutes) > 0 {
+			withNoReplyRouteSrv := task.NewTaskCallbackSrv(srv.GetId(), srv.GetName(), noReplyRoutes, true)
+			if err := r.srvRepo.DelSrvRoutes(contxt.ChildOf(ctx), withNoReplyRouteSrv); err != nil {
+				log.Error(ctx, err)
 			}
 		}
 	}
-}
-
-func (r *Registry) runWorker(ctx context.Context, withNoReplyRouteSrvCh, withReplyRouteSrvCh chan *task.TaskCallbackSrv) {
-	srv := <- r.readyCheckSrvChan
-	heatBeatResp, err := r.callbackSrvExec.HeartBeat(contxt.ChildOf(ctx), srv)
-	if err != nil {
-		logger.MustGetRegistryLogger().Error(ctx, err)
-		return
-	}
-	withNoReplyRouteSrvCh <- task.NewTaskCallbackSrv(srv.GetId(), srv.GetName(), heatBeatResp.GetNoReplyRoutes(), true)
-	withReplyRouteSrvCh <- task.NewTaskCallbackSrv(srv.GetId(), srv.GetName(), heatBeatResp.GetReplyRoutes(), true)
 }

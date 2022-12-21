@@ -5,6 +5,7 @@ import (
 	"github.com/995933447/easytask/internal/registry"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/easytask/pkg/rpc/proto"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
 )
 
@@ -29,10 +30,25 @@ func (s *TaskService) AddTask(ctx context.Context, req *httpproto.AddTaskReq) (*
 		return nil, err
 	}
 
+	var schedMode task.SchedMode
+	switch req.SchedMode {
+	case proto.SchedModeTimeCron:
+		schedMode = task.SchedModeTimeCron
+	case proto.SchedModeTimeInterval:
+		schedMode = task.SchedModeTimeInterval
+	case proto.SchedModeTimeSpec:
+		schedMode = task.SchedModeTimeSpec
+	}
+
 	oneTask, err := task.NewTask(&task.NewTaskReq{
 		CallbackSrv: srv,
 		CallbackPath: req.CallbackPath,
 		Name: req.Name,
+		Arg: req.Arg,
+		SchedMode: schedMode,
+		TimeSpecAt: req.TimeSpecAt,
+		TimeCronExpr: req.TimeCron,
+		TimeIntervalSec: req.TimeIntervalSec,
 	})
 	if err != nil {
 		log.Error(ctx, err)
@@ -48,12 +64,12 @@ func (s *TaskService) AddTask(ctx context.Context, req *httpproto.AddTaskReq) (*
 	return &httpproto.AddTaskResp{Id: taskId}, nil
 }
 
-func (s *TaskService) DelTask(ctx context.Context, req *httpproto.DelTaskReq) (*httpproto.DelTaskResp, error) {
+func (s *TaskService) StopTask(ctx context.Context, req *httpproto.StopTaskReq) (*httpproto.StopTaskResp, error) {
 	if err := s.taskRepo.DelTaskById(ctx, req.Id); err != nil {
 		logger.MustGetSessLogger().Error(ctx, err)
 		return nil, err
 	}
-	return &httpproto.DelTaskResp{}, nil
+	return &httpproto.StopTaskResp{}, nil
 }
 
 func (s *TaskService) ConfirmTask(ctx context.Context, req *httpproto.ConfirmTaskReq) (*httpproto.ConfirmTaskResp, error) {

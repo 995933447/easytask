@@ -6,7 +6,6 @@ import (
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/optionstream"
 	"github.com/995933447/reflectutil"
-	"gorm.io/gorm"
 	"sync/atomic"
 	"time"
 )
@@ -21,13 +20,16 @@ func (r *TaskSrvRepo) AddSrvRoutes(ctx context.Context, srv *task.TaskCallbackSr
 	log := logger.MustGetRepoLogger()
 	conn := r.mustGetConn(ctx)
 	var srvModel TaskCallbackSrvModel
-	if err := conn.Where(DbFieldName+ " = ?", srv.GetName()).Take(&srvModel).Error; err != nil {
-		if err != gorm.ErrRecordNotFound {
-			log.Error(ctx, err)
-			return err
-		}
-		srvModel.Name = srv.GetName()
-		if err = conn.Create(&srv).Error; err != nil {
+	srvModel.Name = srv.GetName()
+	res := conn.Unscoped().Where(DbFieldName + " = ?", srv.GetName()).FirstOrCreate(&srvModel)
+	if res.Error != nil {
+		log.Error(ctx, res.Error)
+		return res.Error
+	}
+
+	if res.RowsAffected == 0 && srvModel.DeletedAt > 0 {
+		err := conn.Unscoped().Model(&srvModel).Where(DbFieldId + " = ?", srvModel.Id).Update(DbFieldDeletedAt, 0).Error
+		if err != nil {
 			log.Error(ctx, err)
 			return err
 		}
@@ -35,8 +37,12 @@ func (r *TaskSrvRepo) AddSrvRoutes(ctx context.Context, srv *task.TaskCallbackSr
 
 	var hasEnableHealthCheck bool
 	for _, route := range srv.GetRoutes() {
+		if route.IsEnableHeathCheck() && !hasEnableHealthCheck {
+			hasEnableHealthCheck = true
+		}
+
 		routeModel := TaskCallbackSrvRouteModel{
-			Schema: route.GetSchema(),
+			SrvSchema: route.GetSchema(),
 			Host: route.GetHost(),
 			Port: route.GetPort(),
 			SrvId: srvModel.Id,
@@ -44,11 +50,10 @@ func (r *TaskSrvRepo) AddSrvRoutes(ctx context.Context, srv *task.TaskCallbackSr
 			EnableHealthCheck: route.IsEnableHeathCheck(),
 		}
 		res := conn.Unscoped().
-			Select(DbFieldId+ " = ?", DbFieldCallbackTimeoutSec).
-			Where(DbFieldSrvId+ " = ?", srvModel.Id).
-			Where(DbFieldHost+ " = ?", route.GetHost()).
-			Where(DbFieldPort+ " = ?", route.GetPort()).
-			Where(DbFieldSchema+ " = ?", route.GetSchema()).
+			Where(DbFieldSrvId + " = ?", srvModel.Id).
+			Where(DbFieldHost + " = ?", route.GetHost()).
+			Where(DbFieldPort + " = ?", route.GetPort()).
+			Where(DbFieldSrvSchema + " = ?", route.GetSchema()).
 			FirstOrCreate(&routeModel)
 		if res.Error != nil {
 			log.Error(ctx, res.Error)
@@ -59,10 +64,6 @@ func (r *TaskSrvRepo) AddSrvRoutes(ctx context.Context, srv *task.TaskCallbackSr
 			continue
 		}
 
-		if route.IsEnableHeathCheck() && !hasEnableHealthCheck {
-			hasEnableHealthCheck = true
-		}
-
 		updateMap := map[string]interface{}{
 			DbFieldDeletedAt:         0,
 			DbFieldEnableHealthCheck: route.IsEnableHeathCheck(),
@@ -70,8 +71,8 @@ func (r *TaskSrvRepo) AddSrvRoutes(ctx context.Context, srv *task.TaskCallbackSr
 		if route.GetCallbackTimeoutSec() != routeModel.CallbackTimeoutSec {
 			updateMap[DbFieldCallbackTimeoutSec] = route.GetCallbackTimeoutSec()
 		}
-		err := conn.Model(&TaskCallbackSrvRouteModel{}).
-			Where(DbFieldId+ " = ?", routeModel.Id).
+		err := conn.Unscoped().Model(&TaskCallbackSrvRouteModel{}).
+			Where(DbFieldId + " = ?", routeModel.Id).
 			Updates(updateMap).
 			Error
 		if err != nil {
@@ -115,8 +116,8 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 		}
 		routeModelIds = append(routeModelIds, routeModelId)
 	}
-	err = conn.Where(DbFieldSrvId+ " = ?", srvModel.Id).
-		Where(DbFieldId+ " IN ?", routeModelIds).
+	err = conn.Where(DbFieldSrvId + " = ?", srvModel.Id).
+		Where(DbFieldId + " IN ?", routeModelIds).
 		Delete(&TaskCallbackSrvRouteModel{}).
 		Error
 	if err != nil {
@@ -130,8 +131,8 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 	}
 	routeNums := &RouteNums{}
 	err = conn.Model(&TaskCallbackSrvRouteModel{}).
-		Select("COUNT(1) AS total, COUNT(IF(" +DbFieldEnableHealthCheck+ " > 0, 1, 0)) AS enabled_check_health_num").
-		Where(DbFieldSrvId+ " = ?", srvModel.Id).
+		Select("COUNT(1) AS total, COUNT(IF(" + DbFieldEnableHealthCheck+ " > 0, 1, 0)) AS enabled_check_health_num").
+		Where(DbFieldSrvId + " = ?", srvModel.Id).
 		Take(&routeNums).
 		Error
 	if err != nil {
@@ -140,7 +141,7 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 	}
 
 	if routeNums.Total == 0 {
-		if err = conn.Where(DbFieldId+ " = ?", srvModel.Id).Delete(&TaskCallbackSrvModel{}).Error; err != nil {
+		if err = conn.Where(DbFieldId + " = ?", srvModel.Id).Delete(&TaskCallbackSrvModel{}).Error; err != nil {
 			log.Error(ctx, err)
 			return err
 		}
@@ -149,7 +150,7 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 
 	if routeNums.EnabledCheckHealthNum == 0 && srvModel.HasEnableHealthCheck {
 		err = conn.Model(&TaskCallbackSrvModel{}).
-			Where(DbFieldId+ " = ?", srvModel.Id).
+			Where(DbFieldId + " = ?", srvModel.Id).
 			Update(DbFieldHasEnableHealthCheck, false).
 			Error
 		if err != nil {
@@ -224,6 +225,7 @@ func (r *TaskSrvRepo) GetSrvsByIds(ctx context.Context, ids []string) ([]*task.T
 func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.QueryStream) ([]*task.TaskCallbackSrv, error) {
 	log := logger.MustGetRepoLogger()
 	conn :=  r.mustGetConn(ctx)
+	srvQueryScope := conn
 	err := optionstream.NewQueryStreamProcessor(queryStream).
 		OnStringList(task.QueryOptKeyInIds, func(val []string) error {
 			var srvModelIds []uint64
@@ -235,15 +237,15 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 				}
 				srvModelIds = append(srvModelIds, srvModelId)
 			}
-			conn.Where(DbFieldId+ " IN ?", srvModelIds)
+			srvQueryScope = srvQueryScope.Where(DbFieldId + " IN ?", srvModelIds)
 			return nil
 		}).
 		OnNone(task.QueryOptKeyEnabledHeathCheck, func() error {
-			conn.Where(DbFieldHasEnableHealthCheck + " = 1")
+			srvQueryScope = srvQueryScope.Where(DbFieldHasEnableHealthCheck + " = 1")
 			return nil
 		}).
 		OnInt64(task.QueryOptKeyCheckedHealthLt, func(val int64) error {
-			conn.Where(DbFieldCheckedHealthAt+ " < ?", val)
+			srvQueryScope = srvQueryScope.Where(DbFieldCheckedHealthAt+ " < ?", val)
 			return nil
 		}).
 		Process()
@@ -253,7 +255,7 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 	}
 
 	var srvModels []*TaskCallbackSrvModel
-	err = conn.Limit(int(queryStream.Limit)).Offset(int(queryStream.Offset)).Find(&srvModels).Error
+	err = srvQueryScope.Limit(int(queryStream.Limit)).Offset(int(queryStream.Offset)).Find(&srvModels).Error
 	if err != nil {
 		log.Error(ctx, err)
 		return nil, err
@@ -266,7 +268,7 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 	srvModelIds := reflectutil.PluckUint64(srvModels, FieldId)
 
 	var routeModels []*TaskCallbackSrvRouteModel
-	err = conn.Where(DbFieldSrvId+ " IN ?", srvModelIds).Find(&routeModels).Error
+	err = conn.Where(DbFieldSrvId + " IN ?", srvModelIds).Find(&routeModels).Error
 	if err != nil {
 		log.Error(ctx, err)
 		return nil, err

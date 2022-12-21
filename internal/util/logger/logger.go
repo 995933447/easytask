@@ -53,6 +53,7 @@ var (
 	repoLogger Logger
 	taskLogger Logger
 	registryLogger Logger
+	callbackLogger Logger
 )
 
 func Init(conf *Conf) {
@@ -71,6 +72,7 @@ func Init(conf *Conf) {
 	repoLogger = NewLogger(conf.LogDir + "/repo", conf.FileSize, conf.Level)
 	taskLogger = NewLogger(conf.LogDir + "/task", conf.FileSize, conf.Level)
 	registryLogger = NewLogger(conf.LogDir + "/registry", conf.FileSize, conf.Level)
+	callbackLogger = NewLogger(conf.LogDir + "/callback", conf.FileSize, conf.Level)
 	hasInit.Store(true)
 }
 
@@ -114,6 +116,13 @@ func MustGetSessLogger() Logger {
 		panic(any("init not finish"))
 	}
 	return sessionLogger
+}
+
+func MustGetCallbackLogger() Logger {
+	if !hasInit.Load() {
+		panic(any("init not finish"))
+	}
+	return callbackLogger
 }
 
 func NewLogger(baseDir string, maxFileSize int64, level string) Logger {

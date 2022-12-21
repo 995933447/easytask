@@ -10,7 +10,7 @@ import (
 	"github.com/995933447/easytask/internal/apiserver"
 	"github.com/995933447/easytask/internal/registry"
 	"github.com/995933447/easytask/internal/task"
-	"github.com/995933447/easytask/internal/task/impl/callbackexec"
+	"github.com/995933447/easytask/internal/task/impl/callback"
 	mysqlrepo "github.com/995933447/easytask/internal/task/impl/repo/mysql"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/easytask/pkg/contxt"
@@ -75,6 +75,8 @@ func main() {
 	}
 
 	logger.Init(conf.LoggerConf)
+
+	logger.MustGetSysLogger().Info(ctx, "easytask starting...")
 
 	defer recoverPanic(ctx)
 
@@ -212,7 +214,7 @@ func runRegistry(ctx context.Context, conf *Conf, taskCallbackSrvRepo task.TaskC
 		conf.IsClusterMode,
 		conf.HealthCheckWorkerPoolSize,
 		taskCallbackSrvRepo,
-		callbackexec.NewHttpExec(),
+		callback.NewHttpExec(),
 		elect,
 		)
 	go reg.Run(contxt.ChildOf(ctx))
@@ -237,10 +239,10 @@ func NewRepos(ctx context.Context, conf *Conf) (task.TaskRepo, task.TaskCallback
 }
 
 func runTaskWorker(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, elect autoelect.AutoElection) {
-	engine :=  task.NewWorkerEngine(
+	engine := task.NewWorkerEngine(
 		conf.TaskWorkerPoolSize,
 		task.NewSched(conf.IsClusterMode, taskRepo, elect),
-		callbackexec.NewHttpExec(),
+		callback.NewHttpExec(),
 		)
 	go engine.Run(contxt.ChildOf(ctx))
 }

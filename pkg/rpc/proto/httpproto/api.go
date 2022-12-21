@@ -1,15 +1,17 @@
 package httpproto
 
-import "github.com/995933447/easytask/internal/task"
+import (
+	"github.com/995933447/easytask/pkg/rpc/proto"
+)
 
 type AddTaskReq struct {
 	Name string `json:"name"`
 	SrvName string 	`json:"srv_name"`
 	CallbackPath string `json:"callback_path"`
-	SchedMode task.SchedMode `json:"sched_mode"`
+	SchedMode proto.SchedMode `json:"sched_mode"`
 	TimeCron string `json:"time_cron"`
-	TimeIntervalSec string `json:"time_interval_sec"`
-	TimeSpec string `json:"time_spec"`
+	TimeIntervalSec int `json:"time_interval_sec"`
+	TimeSpecAt int64 `json:"time_spec_at"`
 	Arg []byte `json:"arg"`
 }
 
@@ -17,11 +19,11 @@ type AddTaskResp struct {
 	Id string `json:"id"`
 }
 
-type DelTaskReq struct {
+type StopTaskReq struct {
 	Id string `json:"id"`
 }
 
-type DelTaskResp struct {
+type StopTaskResp struct {
 }
 
 type ConfirmTaskReq struct {

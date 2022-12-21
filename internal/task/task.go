@@ -100,7 +100,7 @@ func (r *TaskCallbackSrvRoute) IsEnableHeathCheck() bool {
 }
 
 func (r *TaskCallbackSrvRoute) GetId() string {
-	return r.scheme
+	return r.id
 }
 
 func (r *TaskCallbackSrvRoute) GetSchema() string {
@@ -162,6 +162,9 @@ func (s *TaskCallbackSrv) GetId() string {
 }
 
 func (s *TaskCallbackSrv) GetRandomRoute() *TaskCallbackSrvRoute {
+	if len(s.routes) == 0 {
+		return nil
+	}
 	rand.Seed(time.Now().UnixNano())
 	return s.routes[rand.Intn(len(s.routes))]
 }
@@ -269,7 +272,7 @@ func (t *Task) IncrRunTimes() {
 func (t *Task) run(ctx context.Context, callbackExec TaskCallbackSrvExec) (*TaskResp, error) {
 	callbackResp, err := callbackExec.CallbackSrv(contxt.ChildOf(ctx), t, nil)
 	if err != nil {
-		logger.MustGetSysLogger().Error(ctx, err)
+		logger.MustGetTaskLogger().Error(ctx, err)
 		return nil, err
 	}
 

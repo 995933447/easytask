@@ -6,6 +6,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"sync"
+	"time"
 )
 
 type repoConnector struct {
@@ -24,15 +25,15 @@ func (c *repoConnector) mustGetConn(ctx context.Context) *gorm.DB {
 
 func (c *repoConnector) getConn(ctx context.Context) (*gorm.DB, error) {
 	if c.conn != nil {
-		return c.conn, nil
+		return c.conn.WithContext(ctx), nil
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
 	if c.conn != nil {
-		return c.conn, nil
+		return c.conn.WithContext(ctx), nil
 	}
 	var err error
-	if c.conn, err = gorm.Open(mysql.Open(c.connDsn), &gorm.Config{}); err != nil {
+	if c.conn, err = gorm.Open(mysql.Open(c.connDsn), &gorm.Config{Logger: NewLogger(logger.MustGetRepoLogger(), time.Second)}); err != nil {
 		logger.MustGetRepoLogger().Error(ctx, err)
 		return nil, err
 	}

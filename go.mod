@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/995933447/autoelect v0.0.0-20221205105211-eff1e99f1cfb
 	github.com/995933447/confloader v0.0.0-20221201090521-fc5ce6a68064
-	github.com/995933447/dbdriverutil v0.0.0-20220815160147-6e3336599c28
+	github.com/995933447/dbdriverutil v0.0.0-20221221100824-f994880a6ff1
 	github.com/995933447/distribmu v0.0.0-20221129161736-69f07b237cf4
 	github.com/995933447/log-go v0.0.0-20221218090749-3357926f7bc6
 	github.com/995933447/optionstream v0.0.0-20220816081607-a125989b4cd9
@@ -23,7 +23,7 @@ require (
 )
 
 require (
-	github.com/995933447/stringhelper-go v0.0.0-20220806171918-329b8bac9af8 // indirect
+	github.com/995933447/stringhelper-go v0.0.0-20221220072216-628db3bc29d8 // indirect
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/coreos/etcd v3.3.27+incompatible // indirect

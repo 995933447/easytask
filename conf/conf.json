@@ -2,7 +2,7 @@
   "is_cluster_mode": true,
   "cluster_name": "easy_task",
 
-  "task_worker_pool_size": 300,
+  "task_worker_pool_size": 3,
   "health_check_worker_pool_size": 100,
 
   "elect_driver": "redis",
@@ -19,9 +19,8 @@
   },
 
   "log": {
-      "sys_proc_log_dir":"/var/log/easytask/sys/",
-      "session_proc_log_dir": "/var/log/easytask/access/",
-      "level": "warn"
+      "log_dir": "/var/log/easytask/",
+      "level": "debug"
   },
 
   "api_server": {

@@ -1,4 +1,4 @@
-package callbackexec
+package callback
 
 import (
 	"bytes"
@@ -28,7 +28,7 @@ var _ task.TaskCallbackSrvExec = (*HttpExec)(nil)
 
 func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (*task.TaskCallbackSrvResp, error) {
 	var (
-		log = logger.MustGetTaskLogger()
+		log = logger.MustGetCallbackLogger()
 		httpReq = &httpproto.TaskCallbackReq{
 			Cmd: httpproto.HttpCallbackCmdTaskCallback,
 			Arg:      oneTask.GetArg(),
@@ -54,7 +54,6 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (
 		timeoutSec = route.GetCallbackTimeoutSec()
 	}
 	err = e.doReq(contxt.ChildOf(ctx), &doReqInput{
-		Log: log,
 		Path: oneTask.GetCallbackPath(),
 		Route: route,
 		TimeoutSec: timeoutSec,
@@ -71,7 +70,7 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (
 
 func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*task.HeartBeatResp, error) {
 	var (
-		log = logger.MustGetTaskLogger()
+		log = logger.MustGetCallbackLogger()
 		httpReq = &httpproto.HeartBeatReq{
 			Cmd: httpproto.HttpCallbackCmdTaskHeartBeat,
 		}
@@ -95,7 +94,6 @@ func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*t
 			defer wg.Done()
 
 			err = e.doReq(contxt.ChildOf(ctx), &doReqInput{
-				Log: log,
 				Route: route,
 				TimeoutSec: route.GetCallbackTimeoutSec(),
 				ReqBytes: httpReqBytes,
@@ -122,7 +120,6 @@ func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*t
 }
 
 type doReqInput struct {
-	Log logger.Logger `validate:"required"`
 	Path string
 	Route *task.TaskCallbackSrvRoute `validate:"required"`
 	TimeoutSec int
@@ -136,23 +133,27 @@ func (i *doReqInput) Check() error {
 	}
 	i.Path = strings.TrimSpace(i.Path)
 	if i.Path != "" {
-		i.Path += "/"
+		i.Path = "/" + strings.TrimLeft(i.Path, "/")
 	}
 	return nil
 }
 
 func (e *HttpExec) doReq(ctx context.Context, input *doReqInput) error {
+	log := logger.MustGetCallbackLogger()
+
 	if err := input.Check(); err != nil {
+		log.Error(ctx, err)
 		return err
 	}
 
+	reqUrl := fmt.Sprintf("%s://%s:%d%s", input.Route.GetSchema(), input.Route.GetHost(), input.Route.GetPort(), input.Path)
 	httpReq, err := http.NewRequest(
 		http.MethodPost,
-		fmt.Sprintf("%s://%s:%d%s", input.Route.GetSchema(), input.Route.GetHost(), input.Route.GetPort(), input.Path),
+		reqUrl,
 		bytes.NewBuffer(input.ReqBytes),
 	)
 	if err != nil {
-		input.Log.Error(ctx, err)
+		log.Error(ctx, err)
 		return err
 	}
 
@@ -168,21 +169,25 @@ func (e *HttpExec) doReq(ctx context.Context, input *doReqInput) error {
 		httpReq.Header.Add(httpproto.HeaderSimpleTraceParentSpanId, traceCtx.GetParentSpanId())
 	}
 
+	log.Infof(ctx, "post:%s param:%s", reqUrl, string(input.ReqBytes))
+
 	httpResp, err := httpCli.Do(httpReq)
 	if err != nil {
-		input.Log.Error(ctx, err)
+		log.Error(ctx, err)
 		return err
 	}
 
 	httpRespBody, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		input.Log.Error(ctx, err)
+		log.Error(ctx, err)
 		return err
 	}
 
+	log.Infof(ctx, "resp:%s", string(httpRespBody))
+
 	err = json.Unmarshal(httpRespBody, &input.Resp)
 	if err != nil {
-		input.Log.Error(ctx, err)
+		log.Error(ctx, err)
 		return err
 	}
 

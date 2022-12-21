@@ -2,9 +2,6 @@
 package mysql
 
 const (
-	DbFieldconnDsn = "conn_dsn"
-	DbFieldconn = "conn"
-	DbFieldconnMu = "conn_mu"
 	DbFielddb = "db"
 	DbFieldsrvRepo = "srv_repo"
 	DbFielddefaultTaskMaxRunTimeSec = "default_task_max_run_time_sec"
@@ -27,9 +24,10 @@ const (
 	DbFieldLastSuccessAt = "last_success_at"
 	DbFieldAllowMaxRunTimes = "allow_max_run_times"
 	DbFieldMaxRunTimeSec = "max_run_time_sec"
+	DbFieldCallbackPath = "callback_path"
 	DbFieldCheckedHealthAt = "checked_health_at"
 	DbFieldHasEnableHealthCheck = "has_enable_health_check"
-	DbFieldSchema = "schema"
+	DbFieldSrvSchema = "srv_schema"
 	DbFieldHost = "host"
 	DbFieldPort = "port"
 	DbFieldSrvId = "srv_id"
@@ -41,4 +39,9 @@ const (
 	DbFieldTaskStatus = "task_status"
 	DbFieldRespExtra = "resp_extra"
 	DbFieldTryTimes = "try_times"
+	DbFieldbaseLogger = "base_logger"
+	DbFieldslowThreshold = "slow_threshold"
+	DbFieldconnDsn = "conn_dsn"
+	DbFieldconn = "conn"
+	DbFieldconnMu = "conn_mu"
 )
