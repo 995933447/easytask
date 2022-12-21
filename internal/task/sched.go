@@ -32,7 +32,7 @@ func (s *Sched) NextTask() *Task {
 }
 
 func (s *Sched) Run(ctx context.Context) {
-	go s.watchToConfirmTaskRes(ctx)
+	//go s.watchToConfirmTaskRes(ctx)
 	s.schedule(ctx)
 }
 
@@ -40,6 +40,7 @@ func (s *Sched) schedule(ctx context.Context) {
 	var (
 		traceModule = "task_sched"
 		origCtxTraceId string
+		log = logger.MustGetSysLogger()
 	)
 	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
 		origCtxTraceId = traceCtx.GetTraceId()
@@ -52,21 +53,21 @@ func (s *Sched) schedule(ctx context.Context) {
 	for {
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 		if s.isClusterMode && !s.elect.IsMaster() {
-			logger.MustGetSysLogger().Debugf(ctx, "not master")
+			log.Debugf(ctx, "not master")
 			time.Sleep(time.Second)
 			continue
 		}
 
 		tasks, nextCursor, err := s.taskRepo.TimeoutTasks(contxt.ChildOf(ctx), size, cursor)
 		if err != nil {
-			logger.MustGetSysLogger().Error(ctx, err)
+			log.Error(ctx, err)
 			continue
 		}
 
-		logger.MustGetSysLogger().Debugf(ctx, "scheduler tasks(len:%d)", len(tasks))
+		log.Debugf(ctx, "scheduler tasks(len:%d)", len(tasks))
 
 		if len(tasks) == 0 {
-			logger.MustGetSysLogger().Debugf(ctx, "no more tasks, sleep 1 s, last cursor is %s", cursor)
+			log.Debugf(ctx, "no more tasks, sleep 1 s, last cursor is %s", cursor)
 			time.Sleep(time.Second)
 			cursor = ""
 			continue
@@ -80,44 +81,48 @@ func (s *Sched) schedule(ctx context.Context) {
 	}
 }
 
-func (s *Sched) watchToConfirmTaskRes(ctx context.Context) {
-	var (
-		traceModule = "task_confirm"
-		origCtxTraceId string
-	)
-	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
-		origCtxTraceId = traceCtx.GetTraceId()
+//func (s *Sched) watchToConfirmTaskRes(ctx context.Context) {
+//	var (
+//		traceModule = "task_confirm"
+//		origCtxTraceId string
+//	)
+//	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
+//		origCtxTraceId = traceCtx.GetTraceId()
+//	}
+//
+//	for {
+//		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
+//
+//		var taskResps []*TaskResp
+//		taskResp := <-s.taskRespCh
+//		taskResps = append(taskResps, taskResp)
+//		var noMoreTaskResp bool
+//		for {
+//			select {
+//			case taskResp := <- s.taskRespCh:
+//				taskResps = append(taskResps, taskResp)
+//			default:
+//				noMoreTaskResp = true
+//			}
+//
+//			if noMoreTaskResp {
+//				break
+//			}
+//		}
+//
+//		err := s.taskRepo.ConfirmTasks(contxt.ChildOf(ctx), taskResps)
+//		if err != nil {
+//			logger.MustGetSysLogger().Error(ctx, err)
+//		}
+//	}
+//}
+
+func (s *Sched) SubmitTaskResp(ctx context.Context, resp *TaskResp) error {
+	if err := s.taskRepo.ConfirmTask(ctx, resp); err != nil {
+		logger.MustGetSysLogger().Error(ctx, err)
+		return err
 	}
-
-	for {
-		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
-
-		var taskResps []*TaskResp
-		taskResp := <-s.taskRespCh
-		taskResps = append(taskResps, taskResp)
-		var noMoreTaskResp bool
-		for {
-			select {
-			case taskResp := <- s.taskRespCh:
-				taskResps = append(taskResps, taskResp)
-			default:
-				noMoreTaskResp = true
-			}
-
-			if noMoreTaskResp {
-				break
-			}
-		}
-
-		err := s.taskRepo.ConfirmTasks(contxt.ChildOf(ctx), taskResps)
-		if err != nil {
-			logger.MustGetSysLogger().Error(ctx, err)
-		}
-	}
-}
-
-func (s *Sched) SubmitTaskResp(resp *TaskResp) {
-	s.taskRespCh <- resp
+	return nil
 }
 
 func NewSched(isClusterMode bool, taskRepo TaskRepo, elect autoelect.AutoElection) *Sched {

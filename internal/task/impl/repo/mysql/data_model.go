@@ -36,7 +36,7 @@ type BaseModel struct {
 type TaskModel struct {
 	BaseModel
 	Name string
-	Arg field.Json
+	Arg string
 	Status int
 	LastRunAt int64
 	PlanSchedNextAt int64

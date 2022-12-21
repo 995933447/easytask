@@ -12,7 +12,7 @@ type AddTaskReq struct {
 	TimeCron string `json:"time_cron"`
 	TimeIntervalSec int `json:"time_interval_sec"`
 	TimeSpecAt int64 `json:"time_spec_at"`
-	Arg []byte `json:"arg"`
+	Arg string `json:"arg"`
 }
 
 type AddTaskResp struct {
@@ -27,9 +27,9 @@ type StopTaskResp struct {
 }
 
 type ConfirmTaskReq struct {
-	Id string `json:"id"`
+	TaskId string `json:"id"`
 	IsSuccess bool `json:"is_success"`
-	Extra []byte `json:"extra"`
+	Extra string `json:"extra"`
 	TaskRunTimes int `json:"task_run_times"`
 }
 

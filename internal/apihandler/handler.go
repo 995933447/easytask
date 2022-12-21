@@ -79,7 +79,7 @@ func (s *TaskService) ConfirmTask(ctx context.Context, req *httpproto.ConfirmTas
 	} else {
 		taskStatus = task.StatusFailed
 	}
-	err := s.taskRepo.ConfirmTask(ctx, task.NewTaskResp(req.Id, true, taskStatus, req.TaskRunTimes, nil))
+	err := s.taskRepo.ConfirmTask(ctx, task.NewTaskResp(req.TaskId, true, taskStatus, req.TaskRunTimes, req.Extra))
 	if err != nil {
 		logger.MustGetSessLogger().Error(ctx, err)
 		return nil, err

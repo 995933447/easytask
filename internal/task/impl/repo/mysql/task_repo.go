@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/reflectutil"
@@ -340,13 +341,23 @@ func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 		taskStatus = statusFailed
 	}
 
+	var respExtra []byte
+	if resp.GetExtra() != nil {
+		respExtra, err = json.Marshal(resp.GetExtra())
+		if err != nil {
+			log.Error(ctx, err)
+			return err
+		}
+	}
 	err = conn.Model(&TaskLogModel{}).
 		Where(DbFieldTaskId + " = ?", taskModelId).
 		Where(DbFieldRunTimes, resp.GetTaskRunTimes()).
+		Where(DbFieldTaskStatus + " = ?", statusRunning).
 		Updates(map[string]interface{}{
 			DbFieldIsRunInAsync: resp.IsRunInAsync(),
 			DbFieldTaskStatus:   taskStatus,
 			DbFieldEndedAt: time.Now().Unix(),
+			DbFieldRespExtra: respExtra,
 		}).Error
 	if err != nil {
 		log.Error(ctx, err)

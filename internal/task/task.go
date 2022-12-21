@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/easytask/pkg/contxt"
@@ -36,12 +37,12 @@ type (
 		isRunInAsync bool
 		taskStatus Status
 		taskRunTimes int
-		extra any
+		extra string
 	}
 
 	InternalErrTaskRespDetail struct {
-		Err error
-		OccurredAt int64
+		Err error `json:"err"`
+		OccurredAt int64 `json:"occurred_at"`
 	}
 )
 
@@ -65,7 +66,7 @@ func (r *TaskResp) GetTaskRunTimes() int {
 	return r.taskRunTimes
 }
 
-func NewTaskResp(taskId string, isRunInAsync bool, taskStatus Status, taskRunTimes int, extra any) *TaskResp {
+func NewTaskResp(taskId string, isRunInAsync bool, taskStatus Status, taskRunTimes int, extra string) *TaskResp {
 	return &TaskResp{
 		taskId: taskId,
 		isRunInAsync: isRunInAsync,
@@ -75,15 +76,22 @@ func NewTaskResp(taskId string, isRunInAsync bool, taskStatus Status, taskRunTim
 	}
 }
 
-func newInternalErrTaskResp(taskId string, err error, occurredAt int64) *TaskResp {
+func newInternalErrTaskResp(taskId string, err error, occurredAt int64) (*TaskResp, error) {
+	detail := InternalErrTaskRespDetail{
+		Err: err,
+		OccurredAt: occurredAt,
+	}
+
+	extra, err := json.Marshal(detail)
+	if err != nil {
+		return nil, err
+	}
+
 	return &TaskResp{
 		taskId: taskId,
 		taskStatus: StatusFailed,
-		extra: InternalErrTaskRespDetail{
-			Err: err,
-			OccurredAt: occurredAt,
-		},
-	}
+		extra: string(extra),
+	}, nil
 }
 
 type TaskCallbackSrvRoute struct {
@@ -183,7 +191,7 @@ type Task struct {
 	callbackSrv *TaskCallbackSrv
 	callbackPath string
 	name string
-	arg []byte
+	arg string
 	runTimes int
 	lastRunAt int64
 	allowMaxRunTimes int
@@ -257,7 +265,7 @@ func (t *Task) GetCallbackPath() string {
 	return t.callbackPath
 }
 
-func (t *Task) GetArg() []byte {
+func (t *Task) GetArg() string {
 	return t.arg
 }
 
@@ -270,19 +278,21 @@ func (t *Task) IncrRunTimes() {
 }
 
 func (t *Task) run(ctx context.Context, callbackExec TaskCallbackSrvExec) (*TaskResp, error) {
+	log := logger.MustGetTaskLogger()
+
 	callbackResp, err := callbackExec.CallbackSrv(contxt.ChildOf(ctx), t, nil)
 	if err != nil {
-		logger.MustGetTaskLogger().Error(ctx, err)
+		log.Error(ctx, err)
 		return nil, err
 	}
 
 	var status Status
-	if !callbackResp.IsSuccess() {
-		status = StatusFailed
+	if callbackResp.IsSuccess() {
+		status = StatusSuccess
 	} else if callbackResp.IsRunInAsync() {
 		status = StatusRunning
 	} else {
-		status = StatusSuccess
+		status = StatusFailed
 	}
 
 	return NewTaskResp(t.id, callbackResp.IsRunInAsync(), status, t.runTimes, callbackResp.GetExtra()), nil
@@ -293,7 +303,7 @@ type NewTaskReq struct {
 	CallbackSrv *TaskCallbackSrv `validate:"required"`
 	CallbackPath string `json:"callback_path"`
 	Name string `validate:"required"`
-	Arg []byte `validate:"required"`
+	Arg string `validate:"required"`
 	RunTimes int
 	LastRunAt int64
 	AllowMaxRunTimes int

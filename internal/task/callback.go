@@ -9,7 +9,7 @@ type TaskCallbackSrvExec interface {
 	HeartBeat(context.Context, *TaskCallbackSrv) (*HeartBeatResp, error)
 }
 
-func NewCallbackSrvResp(isRunInAsync, isSuccess bool, extra any) *TaskCallbackSrvResp {
+func NewCallbackSrvResp(isRunInAsync, isSuccess bool, extra string) *TaskCallbackSrvResp {
 	return &TaskCallbackSrvResp{
 		isRunInAsync: isRunInAsync,
 		isSuccess: isSuccess,
@@ -20,7 +20,7 @@ func NewCallbackSrvResp(isRunInAsync, isSuccess bool, extra any) *TaskCallbackSr
 type TaskCallbackSrvResp struct {
 	isRunInAsync bool
 	isSuccess bool
-	extra any
+	extra string
 }
 
 func (r *TaskCallbackSrvResp) IsRunInAsync() bool {
@@ -31,7 +31,7 @@ func (r *TaskCallbackSrvResp) IsSuccess() bool {
 	return r.isSuccess
 }
 
-func (r *TaskCallbackSrvResp) GetExtra() any {
+func (r *TaskCallbackSrvResp) GetExtra() string {
 	return r.extra
 }
 

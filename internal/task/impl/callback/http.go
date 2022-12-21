@@ -30,7 +30,8 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (
 	var (
 		log = logger.MustGetCallbackLogger()
 		httpReq = &httpproto.TaskCallbackReq{
-			Cmd: httpproto.HttpCallbackCmdTaskCallback,
+			Cmd: 	  httpproto.HttpCallbackCmdTaskCallback,
+			TaskId:   oneTask.GetId(),
 			Arg:      oneTask.GetArg(),
 			TaskName: oneTask.GetName(),
 			RunTimes: oneTask.GetRunTimes(),

@@ -78,26 +78,33 @@ func (e *workerEngine) runWorker(ctx context.Context, workerId uint) {
 		locked, err := e.sched.LockTaskForRun(contxt.ChildOf(ctx), task)
 		if err != nil {
 			log.Error(ctx, err)
-			return
+			continue
 		}
 
 		if !locked {
 			log.Warnf(ctx, "worker(id:%d) lock task(id:%s) failed", workerId, task.id)
-			return
+			continue
 		}
 
 		taskResp, err := task.run(contxt.ChildOf(ctx), e.callbackTaskSrvExec)
 		if err != nil {
 			log.Error(ctx, err)
-			taskResp = newInternalErrTaskResp(task.id, err, now.Unix())
+			taskResp, err = newInternalErrTaskResp(task.id, err, now.Unix())
+			if err != nil {
+				log.Error(ctx, err)
+				continue
+			}
+		}
+
+		err = e.sched.SubmitTaskResp(ctx, taskResp)
+		if err != nil {
+			log.Error(ctx, err)
 		}
 
 		log.Infof(
 			ctx,
 			"worker(id:%d) finish task(id:%s name:%s), exec time:%d ms",
 			workerId, task.id, task.name, time.Now().Sub(now) / time.Millisecond,
-			)
-
-		e.sched.SubmitTaskResp(taskResp)
+		)
 	}
 }

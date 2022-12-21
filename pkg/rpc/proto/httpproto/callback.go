@@ -8,13 +8,14 @@ const (
 type TaskCallbackResp struct {
 	IsRunInAsync bool `json:"is_run_in_async"`
 	IsSuccess bool `json:"is_success"`
-	Extra []byte `json:"extra"`
+	Extra string `json:"extra"`
 }
 
 type TaskCallbackReq struct {
 	Cmd int `json:"cmd"`
+	TaskId string `json:"id"`
 	TaskName string `json:"task_name"`
-	Arg      []byte `json:"arg"`
+	Arg      string `json:"arg"`
 	RunTimes int    `json:"run_times"`
 }
 
