@@ -80,7 +80,7 @@ func main() {
 
 	defer recoverPanic(ctx)
 
-	elect, errDuringElect, err := startElect(contxt.ChildOf(ctx), conf)
+	elect, errDuringElect, err := startElect(ctx, conf)
 	if err != nil {
 		panic(any(err))
 	}
@@ -96,14 +96,14 @@ func main() {
 		}
 	}()
 
-	taskRepo, taskCallbackSrvRepo, err := NewRepos(contxt.ChildOf(ctx), conf)
+	taskRepo, taskCallbackSrvRepo, err := NewRepos(ctx, conf)
 	if err != nil {
 		panic(any(err))
 	}
 
-	reg := runRegistry(contxt.ChildOf(ctx), conf, taskCallbackSrvRepo, elect)
+	reg := runRegistry(ctx, conf, taskCallbackSrvRepo, elect)
 
-	runTaskWorker(contxt.ChildOf(ctx), conf, taskRepo, elect)
+	runTaskWorker(ctx, conf, taskRepo, elect)
 
 	signCh := make(chan os.Signal)
 	go func() {
@@ -115,7 +115,7 @@ func main() {
 	}()
 	signal.Notify(signCh, syscall.SIGINT, syscall.SIGTERM)
 
-	if err = runHttpApiServer(contxt.ChildOf(ctx), conf, taskRepo, reg); err != nil {
+	if err = runHttpApiServer(ctx, conf, taskRepo, reg); err != nil {
 		panic(any(err))
 	}
 }
@@ -227,11 +227,11 @@ func NewRepos(ctx context.Context, conf *Conf) (task.TaskRepo, task.TaskCallback
 		taskCallbackSrvRepo task.TaskCallbackSrvRepo
 		err                 error
 	)
-	if taskCallbackSrvRepo, err = mysqlrepo.NewTaskSrvRepo(contxt.ChildOf(ctx), conf.MysqlConf.ConnDsn); err != nil {
+	if taskCallbackSrvRepo, err = mysqlrepo.NewTaskSrvRepo(ctx, conf.MysqlConf.ConnDsn); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, nil, err
 	}
-	if taskRepo, err = mysqlrepo.NewTaskRepo(contxt.ChildOf(ctx), conf.MysqlConf.ConnDsn, taskCallbackSrvRepo); err != nil {
+	if taskRepo, err = mysqlrepo.NewTaskRepo(ctx, conf.MysqlConf.ConnDsn, taskCallbackSrvRepo); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, nil, err
 	}
@@ -249,11 +249,11 @@ func runTaskWorker(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, elec
 
 func runHttpApiServer(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, reg *registry.Registry) error {
 	router := apiserver.NewHttpRouter(conf.HttpApiSrvConf.Host, conf.HttpApiSrvConf.Port)
-	if err := router.RegisterBatch(contxt.ChildOf(ctx), getHttpApiRoutes(taskRepo, reg)); err != nil {
+	if err := router.RegisterBatch(ctx, getHttpApiRoutes(taskRepo, reg)); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}
-	if err := router.Boot(contxt.ChildOf(ctx)); err != nil {
+	if err := router.Boot(ctx); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}

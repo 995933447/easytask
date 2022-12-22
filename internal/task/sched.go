@@ -18,8 +18,8 @@ type Sched struct {
 	isClusterMode bool
 }
 
-func (s *Sched) LockTaskForRun(ctx context.Context, task *Task) (bool, error) {
-	locked, err := s.taskRepo.LockTask(contxt.ChildOf(ctx), task)
+func (s *Sched) lockTaskForRun(ctx context.Context, task *Task) (bool, error) {
+	locked, err := s.taskRepo.LockTask(ctx, task)
 	if err != nil {
 		logger.MustGetTaskLogger().Error(ctx, err)
 		return false, err
@@ -27,11 +27,11 @@ func (s *Sched) LockTaskForRun(ctx context.Context, task *Task) (bool, error) {
 	return locked, nil
 }
 
-func (s *Sched) NextTask() *Task {
+func (s *Sched) nextTask() *Task {
 	return <- s.taskCh
 }
 
-func (s *Sched) Run(ctx context.Context) {
+func (s *Sched) run(ctx context.Context) {
 	//go s.watchToConfirmTaskRes(ctx)
 	s.schedule(ctx)
 }
@@ -40,7 +40,6 @@ func (s *Sched) schedule(ctx context.Context) {
 	var (
 		traceModule = "task_sched"
 		origCtxTraceId string
-		log = logger.MustGetSysLogger()
 	)
 	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
 		origCtxTraceId = traceCtx.GetTraceId()
@@ -53,21 +52,21 @@ func (s *Sched) schedule(ctx context.Context) {
 	for {
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 		if s.isClusterMode && !s.elect.IsMaster() {
-			log.Debugf(ctx, "not master")
+			logger.MustGetSysLogger().Debugf(ctx, "not master")
 			time.Sleep(time.Second)
 			continue
 		}
 
-		tasks, nextCursor, err := s.taskRepo.TimeoutTasks(contxt.ChildOf(ctx), size, cursor)
+		tasks, nextCursor, err := s.taskRepo.TimeoutTasks(ctx, size, cursor)
 		if err != nil {
-			log.Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 			continue
 		}
 
-		log.Debugf(ctx, "scheduler tasks(len:%d)", len(tasks))
+		logger.MustGetSysLogger().Debugf(ctx, "scheduler tasks(len:%d)", len(tasks))
 
 		if len(tasks) == 0 {
-			log.Debugf(ctx, "no more tasks, sleep 1 s, last cursor is %s", cursor)
+			logger.MustGetSysLogger().Debugf(ctx, "no more tasks, sleep 1 s, last cursor is %s", cursor)
 			time.Sleep(time.Second)
 			cursor = ""
 			continue
@@ -117,7 +116,7 @@ func (s *Sched) schedule(ctx context.Context) {
 //	}
 //}
 
-func (s *Sched) SubmitTaskResp(ctx context.Context, resp *TaskResp) error {
+func (s *Sched) submitTaskResp(ctx context.Context, resp *TaskResp) error {
 	if err := s.taskRepo.ConfirmTask(ctx, resp); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return err

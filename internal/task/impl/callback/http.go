@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
-	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
 	simpletracectx "github.com/995933447/simpletrace/context"
 	"github.com/go-playground/validator"
@@ -28,7 +27,6 @@ var _ task.TaskCallbackSrvExec = (*HttpExec)(nil)
 
 func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (*task.TaskCallbackSrvResp, error) {
 	var (
-		log = logger.MustGetCallbackLogger()
 		httpReq = &httpproto.TaskCallbackReq{
 			Cmd: 	  httpproto.HttpCallbackCmdTaskCallback,
 			TaskId:   oneTask.GetId(),
@@ -41,7 +39,7 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (
 
 	httpReqBytes, err := json.Marshal(httpReq)
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetCallbackLogger().Error(ctx, err)
 		return nil, err
 	}
 
@@ -54,7 +52,7 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (
 	} else {
 		timeoutSec = route.GetCallbackTimeoutSec()
 	}
-	err = e.doReq(contxt.ChildOf(ctx), &doReqInput{
+	err = e.doReq(ctx, &doReqInput{
 		Path: oneTask.GetCallbackPath(),
 		Route: route,
 		TimeoutSec: timeoutSec,
@@ -62,7 +60,7 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (
 		Resp: httpResp,
 	})
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetCallbackLogger().Error(ctx, err)
 		return nil, err
 	}
 
@@ -71,7 +69,6 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (
 
 func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*task.HeartBeatResp, error) {
 	var (
-		log = logger.MustGetCallbackLogger()
 		httpReq = &httpproto.HeartBeatReq{
 			Cmd: httpproto.HttpCallbackCmdTaskHeartBeat,
 		}
@@ -80,7 +77,7 @@ func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*t
 
 	httpReqBytes, err := json.Marshal(httpReq)
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetCallbackLogger().Error(ctx, err)
 		return nil, err
 	}
 
@@ -94,20 +91,20 @@ func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*t
 		go func(route *task.TaskCallbackSrvRoute) {
 			defer wg.Done()
 
-			err = e.doReq(contxt.ChildOf(ctx), &doReqInput{
+			err = e.doReq(ctx, &doReqInput{
 				Route: route,
 				TimeoutSec: route.GetCallbackTimeoutSec(),
 				ReqBytes: httpReqBytes,
 				Resp: httpResp,
 			})
 			if err != nil {
-				log.Error(ctx, err)
+				logger.MustGetCallbackLogger().Error(ctx, err)
 				noReplyRoutes = append(noReplyRoutes, route)
 				return
 			}
 
 			if !httpResp.Pong {
-				log.Warnf(ctx, "route(id:%s) heart beat resp.Pong is false", route.GetId())
+				logger.MustGetCallbackLogger().Warnf(ctx, "route(id:%s) heart beat resp.Pong is false", route.GetId())
 				noReplyRoutes = append(noReplyRoutes, route)
 				return
 			}
@@ -140,10 +137,8 @@ func (i *doReqInput) Check() error {
 }
 
 func (e *HttpExec) doReq(ctx context.Context, input *doReqInput) error {
-	log := logger.MustGetCallbackLogger()
-
 	if err := input.Check(); err != nil {
-		log.Error(ctx, err)
+		logger.MustGetCallbackLogger().Error(ctx, err)
 		return err
 	}
 
@@ -154,7 +149,7 @@ func (e *HttpExec) doReq(ctx context.Context, input *doReqInput) error {
 		bytes.NewBuffer(input.ReqBytes),
 	)
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetCallbackLogger().Error(ctx, err)
 		return err
 	}
 
@@ -170,25 +165,25 @@ func (e *HttpExec) doReq(ctx context.Context, input *doReqInput) error {
 		httpReq.Header.Add(httpproto.HeaderSimpleTraceParentSpanId, traceCtx.GetParentSpanId())
 	}
 
-	log.Infof(ctx, "post:%s param:%s", reqUrl, string(input.ReqBytes))
+	logger.MustGetCallbackLogger().Infof(ctx, "post:%s param:%s", reqUrl, string(input.ReqBytes))
 
 	httpResp, err := httpCli.Do(httpReq)
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetCallbackLogger().Error(ctx, err)
 		return err
 	}
 
 	httpRespBody, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetCallbackLogger().Error(ctx, err)
 		return err
 	}
 
-	log.Infof(ctx, "resp:%s", string(httpRespBody))
+	logger.MustGetCallbackLogger().Infof(ctx, "resp:%s", string(httpRespBody))
 
 	err = json.Unmarshal(httpRespBody, &input.Resp)
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetCallbackLogger().Error(ctx, err)
 		return err
 	}
 

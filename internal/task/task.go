@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/995933447/easytask/internal/util/logger"
-	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/go-playground/validator"
 	"github.com/gorhill/cronexpr"
 	"math/rand"
@@ -15,7 +14,7 @@ import (
 type Status int
 
 const (
-	StatusNil = iota
+	StatusNil Status = iota
 	StatusReady
 	StatusRunning
 	StatusSuccess
@@ -54,7 +53,7 @@ func (r *TaskResp) IsRunInAsync() bool {
 	return r.isRunInAsync
 }
 
-func (r *TaskResp) GetExtra() any {
+func (r *TaskResp) GetExtra() string {
 	return r.extra
 }
 
@@ -278,11 +277,9 @@ func (t *Task) IncrRunTimes() {
 }
 
 func (t *Task) run(ctx context.Context, callbackExec TaskCallbackSrvExec) (*TaskResp, error) {
-	log := logger.MustGetTaskLogger()
-
-	callbackResp, err := callbackExec.CallbackSrv(contxt.ChildOf(ctx), t, nil)
+	callbackResp, err := callbackExec.CallbackSrv(ctx, t, nil)
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetTaskLogger().Error(ctx, err)
 		return nil, err
 	}
 

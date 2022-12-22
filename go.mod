@@ -7,7 +7,7 @@ require (
 	github.com/995933447/confloader v0.0.0-20221201090521-fc5ce6a68064
 	github.com/995933447/dbdriverutil v0.0.0-20221221100824-f994880a6ff1
 	github.com/995933447/distribmu v0.0.0-20221129161736-69f07b237cf4
-	github.com/995933447/log-go v0.0.0-20221218090749-3357926f7bc6
+	github.com/995933447/log-go v0.0.0-20221222104637-f27b34e27ceb
 	github.com/995933447/optionstream v0.0.0-20220816081607-a125989b4cd9
 	github.com/995933447/redisgroup v0.0.0-20220803160352-e08d00f81719
 	github.com/995933447/reflectutil v0.0.0-20220816152525-eaa34e263589
@@ -25,6 +25,7 @@ require (
 require (
 	github.com/995933447/stringhelper-go v0.0.0-20221220072216-628db3bc29d8 // indirect
 	github.com/BurntSushi/toml v1.2.1 // indirect
+	github.com/ahmek/kit v0.4.6 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/coreos/etcd v3.3.27+incompatible // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect

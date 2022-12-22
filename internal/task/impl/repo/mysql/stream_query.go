@@ -18,11 +18,10 @@ func NewOptStreamQuery(db *gorm.DB) *OptStreamQuery {
 }
 
 func (q *OptStreamQuery) Hit(ctx context.Context, limit, offset int64, list interface{}) (int64, error) {
-	log := logger.MustGetSysLogger()
 	db := q.db.WithContext(ctx)
 	var count int64
 	if err := db.Count(&count).Error; err != nil {
-		log.Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return 0, err
 	}
 	if limit > 0 {
@@ -32,7 +31,7 @@ func (q *OptStreamQuery) Hit(ctx context.Context, limit, offset int64, list inte
 		db.Limit(int(offset))
 	}
 	if err := db.Find(list).Error; err != nil {
-		log.Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return 0, err
 	}
 	return count, nil

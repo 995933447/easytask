@@ -11,8 +11,8 @@ import (
 	"github.com/995933447/easytask/pkg/errs"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
 	simpletracectx "github.com/995933447/simpletrace/context"
+	"github.com/ahmek/kit/args"
 	"github.com/go-playground/validator"
-	"io"
 	"net/http"
 	"reflect"
 	"sync"
@@ -52,10 +52,8 @@ func (r *HttpRouter) Register(ctx context.Context, route *HttpRoute) error {
 		return internalerr.ErrServerStarted
 	}
 
-	log := logger.MustGetSysLogger()
-
 	if err := route.Check(); err != nil {
-		log.Error(ctx, err)
+		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}
 
@@ -63,19 +61,19 @@ func (r *HttpRouter) Register(ctx context.Context, route *HttpRoute) error {
 	errInvalidHandler := errors.New("handler must be implements func(context.Context, *req)) (*resp, error)")
 
 	if handlerType.NumIn() != 2 || handlerType.NumOut() != 2 {
-		log.Error(ctx, errInvalidHandler)
+		logger.MustGetSysLogger().Error(ctx, errInvalidHandler)
 		return errInvalidHandler
 	}
 
 	if _, ok := reflect.New(handlerType.In(0)).Interface().(*context.Context); !ok {
-		log.Error(ctx, errInvalidHandler)
+		logger.MustGetSysLogger().Error(ctx, errInvalidHandler)
 		return errInvalidHandler
 	}
 
 	reqType := handlerType.In(1)
 	if reqType.Kind() == reflect.Pointer {
 		if reqType = reqType.Elem(); reqType.Kind() != reflect.Struct {
-			log.Error(ctx, errInvalidHandler)
+			logger.MustGetSysLogger().Error(ctx, errInvalidHandler)
 			return errInvalidHandler
 		}
 	}
@@ -83,13 +81,13 @@ func (r *HttpRouter) Register(ctx context.Context, route *HttpRoute) error {
 	respType := handlerType.Out(0)
 	if handlerType.Out(0).Kind() != reflect.Pointer {
 		if respType = respType.Elem(); respType.Kind() != reflect.Struct {
-			log.Error(ctx, errInvalidHandler)
+			logger.MustGetSysLogger().Error(ctx, errInvalidHandler)
 			return errInvalidHandler
 		}
 	}
 
 	if _, ok := reflect.New(handlerType.Out(1)).Interface().(*error); !ok {
-		log.Error(ctx, errInvalidHandler)
+		logger.MustGetSysLogger().Error(ctx, errInvalidHandler)
 		return errInvalidHandler
 	}
 
@@ -129,8 +127,20 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 		}
 	}()
 
-	respErr := func(ctx context.Context, writer http.ResponseWriter, errCode errs.ErrCode, header map[string]string) {
-		if err := r.writeResp(ctx, writer, 200, []byte(errs.GetErrMsg(errCode)), header); err != nil {
+	respErr := func(ctx context.Context, writer http.ResponseWriter, errCode errs.ErrCode, errMsg string, header map[string]string) {
+		if errMsg == "" {
+			errMsg = errs.GetErrMsg(errCode)
+		}
+		content := httpproto.StdFmtResp{
+			Code: errCode,
+			Msg: errMsg,
+		}
+		contentJson, err := json.Marshal(content)
+		if err != nil {
+			logger.MustGetSessLogger().Error(ctx, err)
+			return
+		}
+		if err := r.writeResp(ctx, writer, 200, contentJson, header); err != nil {
 			logger.MustGetSessLogger().Error(ctx, err)
 		}
 	}
@@ -167,24 +177,40 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 					respHeader[httpproto.HeaderSimpleTraceParentSpanId] = traceCtx.GetParentSpanId()
 				}
 
-				logger.MustGetSessLogger().Debugf(ctx, "access path:%s", path)
+				logger.MustGetSessLogger().Infof(
+					ctx,
+					"receive http request. method:%s, path:%s",
+					req.Method, req.RequestURI,
+					)
 
 				handlerReflec, ok := methodToHandlerMap[req.Method]
 				if !ok {
-					respErr(ctx, writer, errs.ErrCodeRouteMethodNotAllow, respHeader)
-					return
-				}
-
-				httpBody, err := io.ReadAll(req.Body)
-				if err != nil {
-					respErr(ctx, writer, errs.ErrCodeArgsInvalid, respHeader)
+					respErr(ctx, writer, errs.ErrCodeRouteMethodNotAllow, "", respHeader)
 					return
 				}
 
 				handleReq := reflect.New(handlerReflec.req)
-				err = json.Unmarshal(httpBody, handleReq.Interface())
-				if err != nil {
-					respErr(ctx, writer, errs.ErrCodeArgsInvalid, respHeader)
+				httpCtx := args.NewHTTPContext(writer, req.WithContext(req.Context()))
+				switch req.Method {
+				case http.MethodPost:
+					if err := httpCtx.PostArg(handleReq.Interface()); err != nil {
+						logger.MustGetSessLogger().Error(ctx, err)
+						respErr(ctx, writer, errs.ErrCodeArgsInvalid, "", respHeader)
+						return
+					}
+				case http.MethodGet:
+					if err := httpCtx.GetArg(handleReq.Interface()); err != nil {
+						logger.MustGetSessLogger().Error(ctx, err)
+						respErr(ctx, writer, errs.ErrCodeArgsInvalid, "", respHeader)
+						return
+					}
+				}
+
+				logger.MustGetSessLogger().Infof(ctx, "request param:%+v", handleReq.Interface())
+
+				if err := validator.New().Struct(handleReq.Interface()); err != nil {
+					logger.MustGetSessLogger().Error(ctx, err)
+					respErr(ctx, writer, errs.ErrCodeArgsInvalid, err.Error(), respHeader)
 					return
 				}
 
@@ -192,18 +218,20 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 				replyErr := replies[1].Interface()
 				if replyErr != nil {
 					logger.MustGetSessLogger().Error(ctx, replyErr)
-					respErr(ctx, writer, errs.ErrCodeInternal, respHeader)
+					respErr(ctx, writer, errs.ErrCodeInternal, "", respHeader)
 					return
 				}
 
-				resp := replies[0].Interface()
+				resp := &httpproto.StdFmtResp{
+					Data: replies[0].Interface(),
+				}
 				respJson, err := json.Marshal(resp)
 				if err != nil {
 					logger.MustGetSessLogger().Error(ctx, err)
 					if handleErr, ok := err.(*HandleErr); ok {
-						respErr(ctx, writer, handleErr.errCode, respHeader)
+						respErr(ctx, writer, handleErr.errCode, "", respHeader)
 					} else {
-						respErr(ctx, writer, errs.ErrCodeInternal, respHeader)
+						respErr(ctx, writer, errs.ErrCodeInternal, "", respHeader)
 					}
 					return
 				}
@@ -232,8 +260,15 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 func (r *HttpRouter) writeResp(ctx context.Context, writer http.ResponseWriter, code int, content []byte, header map[string]string) error {
 	writer.WriteHeader(code)
 
+	defer func() {
+		var headerLine string
+		for key, val := range header {
+			headerLine += key + ":" + val + "; "
+		}
+		logger.MustGetSessLogger().Infof(ctx, "resp body:%s, resp header:[%s]", string(content), headerLine)
+	}()
+
 	for key, val := range header {
-		logger.MustGetSessLogger().Debugf(ctx, "resp header:%s => %s", key, val)
 		writer.Header().Set(key, val)
 	}
 

@@ -49,19 +49,17 @@ func NewRegistry(
 }
 
 func (r *Registry) Discover(ctx context.Context, srvName string) (*task.TaskCallbackSrv, error) {
-	log := logger.MustGetRegistryLogger()
-
 	srvs, err := r.srvRepo.GetSrvs(
-		contxt.ChildOf(ctx),
+		ctx,
 		optionstream.NewQueryStream(nil, 1, 0).SetOption(task.QueryOptKeyEqName, srvName),
 	)
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetRegistryLogger().Error(ctx, err)
 		return nil, err
 	}
 
 	if len(srvs) == 0 {
-		log.Warnf(ctx, "task callback server(name:%s) not found", srvName)
+		logger.MustGetRegistryLogger().Warnf(ctx, "task callback server(name:%s) not found", srvName)
 		return nil, errs.ErrTaskCallbackServerNotFound
 	}
 
@@ -70,7 +68,7 @@ func (r *Registry) Discover(ctx context.Context, srvName string) (*task.TaskCall
 
 // 注册路由，如果服务名称已经存在，则增量添加路由
 func (r *Registry) Register(ctx context.Context, srv *task.TaskCallbackSrv) error {
-	if err := r.srvRepo.AddSrvRoutes(contxt.ChildOf(ctx), srv); err != nil {
+	if err := r.srvRepo.AddSrvRoutes(ctx, srv); err != nil {
 		logger.MustGetRegistryLogger().Error(ctx, err)
 		return err
 	}
@@ -79,7 +77,7 @@ func (r *Registry) Register(ctx context.Context, srv *task.TaskCallbackSrv) erro
 
 // 删除路由
 func (r *Registry) Unregister(ctx context.Context, srv *task.TaskCallbackSrv) error {
-	if err := r.srvRepo.DelSrvRoutes(contxt.ChildOf(ctx), srv); err != nil {
+	if err := r.srvRepo.DelSrvRoutes(ctx, srv); err != nil {
 		logger.MustGetRegistryLogger().Error(ctx, err)
 		return err
 	}
@@ -99,7 +97,7 @@ func (r *Registry) HeathCheck(ctx context.Context) error {
 	queryStream := optionstream.NewQueryStream(nil, size, offset).
 		SetOption(task.QueryOptKeyEnabledHeathCheck, nil)
 	for {
-		srvs, err := r.srvRepo.GetSrvs(contxt.ChildOf(ctx), queryStream)
+		srvs, err := r.srvRepo.GetSrvs(ctx, queryStream)
 		if err != nil {
 			logger.MustGetRegistryLogger().Error(ctx, err)
 			return err
@@ -132,7 +130,6 @@ func (r *Registry) sched(ctx context.Context) {
 	var (
 		traceModule = "registry_sched"
 		origCtxTraceId string
-		log = logger.MustGetRegistryLogger()
 	)
 	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
 		origCtxTraceId = traceCtx.GetTraceId()
@@ -141,36 +138,34 @@ func (r *Registry) sched(ctx context.Context) {
 	for {
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 
-		log.Debug(ctx, "checking health")
+		logger.MustGetRegistryLogger().Debug(ctx, "checking health")
 
-		if err := r.HeathCheck(contxt.ChildOf(ctx)); err != nil {
-			log.Error(ctx, err)
+		if err := r.HeathCheck(ctx); err != nil {
+			logger.MustGetRegistryLogger().Error(ctx, err)
 		}
 
-		log.Debug(ctx, "checked health")
+		logger.MustGetRegistryLogger().Debug(ctx, "checked health")
 
 		time.Sleep(time.Duration(r.checkHealthIntervalSec) * time.Second)
 	}
 }
 
 func (r *Registry) createHealthCheckWorkerPool(ctx context.Context) {
-	log := logger.MustGetRegistryLogger()
-	log.Info(ctx, "start create health check worker pool")
+	logger.MustGetRegistryLogger().Info(ctx, "start create health check worker pool")
 
 	var i uint
 	for ; i < r.checkHealthWorkerPoolSize; i++ {
 		go r.runWorker(contxt.ChildOf(ctx))
-		log.Infof(ctx, "worker(id:%d) is running", i)
+		logger.MustGetRegistryLogger().Infof(ctx, "worker(id:%d) is running", i)
 	}
 
-	log.Info(ctx, "finish creating health check worker pool")
+	logger.MustGetRegistryLogger().Info(ctx, "finish creating health check worker pool")
 }
 
 func (r *Registry) runWorker(ctx context.Context) {
 	var (
 		traceModule = "registry_worker"
 		origCtxTraceId string
-		log = logger.MustGetRegistryLogger()
 	)
 	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
 		origCtxTraceId = traceCtx.GetTraceId()
@@ -180,9 +175,9 @@ func (r *Registry) runWorker(ctx context.Context) {
 
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 
-		log.Debugf(ctx, "checking srv(name:%s)", srv.GetName())
+		logger.MustGetRegistryLogger().Debugf(ctx, "checking srv(name:%s)", srv.GetName())
 
-		heatBeatResp, err := r.callbackSrvExec.HeartBeat(contxt.ChildOf(ctx), srv)
+		heatBeatResp, err := r.callbackSrvExec.HeartBeat(ctx, srv)
 		if err != nil {
 			logger.MustGetRegistryLogger().Error(ctx, err)
 			continue
@@ -191,16 +186,16 @@ func (r *Registry) runWorker(ctx context.Context) {
 		replyRoutes := heatBeatResp.GetReplyRoutes()
 		if len(replyRoutes) > 0 {
 			withReplyRouteSrv := task.NewTaskCallbackSrv(srv.GetId(), srv.GetName(), replyRoutes, true)
-			if err := r.srvRepo.SetSrvRoutesPassHealthCheck(contxt.ChildOf(ctx), withReplyRouteSrv); err != nil {
-				log.Error(ctx, err)
+			if err := r.srvRepo.SetSrvRoutesPassHealthCheck(ctx, withReplyRouteSrv); err != nil {
+				logger.MustGetRegistryLogger().Error(ctx, err)
 			}
 		}
 
 		noReplyRoutes := heatBeatResp.GetNoReplyRoutes()
 		if len(noReplyRoutes) > 0 {
 			withNoReplyRouteSrv := task.NewTaskCallbackSrv(srv.GetId(), srv.GetName(), noReplyRoutes, true)
-			if err := r.srvRepo.DelSrvRoutes(contxt.ChildOf(ctx), withNoReplyRouteSrv); err != nil {
-				log.Error(ctx, err)
+			if err := r.srvRepo.DelSrvRoutes(ctx, withNoReplyRouteSrv); err != nil {
+				logger.MustGetRegistryLogger().Error(ctx, err)
 			}
 		}
 	}

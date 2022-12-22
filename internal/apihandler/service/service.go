@@ -1,12 +1,10 @@
-package apihandler
+package service
 
 import (
 	"context"
 	"github.com/995933447/easytask/internal/registry"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
-	"github.com/995933447/easytask/pkg/rpc/proto"
-	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
 )
 
 func NewTaskService(taskRepo task.TaskRepo, reg *registry.Registry) *TaskService {
@@ -21,23 +19,11 @@ type TaskService struct {
 	reg      *registry.Registry
 }
 
-func (s *TaskService) AddTask(ctx context.Context, req *httpproto.AddTaskReq) (*httpproto.AddTaskResp, error) {
-	log := logger.MustGetSessLogger()
-
+func (s *TaskService) AddTask(ctx context.Context, req *AddTaskReq) (*AddTaskResp, error) {
 	srv, err := s.reg.Discover(ctx, req.SrvName)
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetSessLogger().Error(ctx, err)
 		return nil, err
-	}
-
-	var schedMode task.SchedMode
-	switch req.SchedMode {
-	case proto.SchedModeTimeCron:
-		schedMode = task.SchedModeTimeCron
-	case proto.SchedModeTimeInterval:
-		schedMode = task.SchedModeTimeInterval
-	case proto.SchedModeTimeSpec:
-		schedMode = task.SchedModeTimeSpec
 	}
 
 	oneTask, err := task.NewTask(&task.NewTaskReq{
@@ -45,34 +31,34 @@ func (s *TaskService) AddTask(ctx context.Context, req *httpproto.AddTaskReq) (*
 		CallbackPath: req.CallbackPath,
 		Name: req.Name,
 		Arg: req.Arg,
-		SchedMode: schedMode,
+		SchedMode: req.SchedMode,
 		TimeSpecAt: req.TimeSpecAt,
 		TimeCronExpr: req.TimeCron,
 		TimeIntervalSec: req.TimeIntervalSec,
 	})
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetSessLogger().Error(ctx, err)
 		return nil, err
 	}
 
 	taskId, err := s.taskRepo.AddTask(ctx, oneTask)
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetSessLogger().Error(ctx, err)
 		return nil, err
 	}
 
-	return &httpproto.AddTaskResp{Id: taskId}, nil
+	return &AddTaskResp{Id: taskId}, nil
 }
 
-func (s *TaskService) StopTask(ctx context.Context, req *httpproto.StopTaskReq) (*httpproto.StopTaskResp, error) {
+func (s *TaskService) StopTask(ctx context.Context, req *StopTaskReq) (*StopTaskResp, error) {
 	if err := s.taskRepo.DelTaskById(ctx, req.Id); err != nil {
 		logger.MustGetSessLogger().Error(ctx, err)
 		return nil, err
 	}
-	return &httpproto.StopTaskResp{}, nil
+	return &StopTaskResp{}, nil
 }
 
-func (s *TaskService) ConfirmTask(ctx context.Context, req *httpproto.ConfirmTaskReq) (*httpproto.ConfirmTaskResp, error) {
+func (s *TaskService) ConfirmTask(ctx context.Context, req *ConfirmTaskReq) (*ConfirmTaskResp, error) {
 	var taskStatus task.Status
 	if req.IsSuccess {
 		taskStatus = task.StatusSuccess
@@ -84,7 +70,7 @@ func (s *TaskService) ConfirmTask(ctx context.Context, req *httpproto.ConfirmTas
 		logger.MustGetSessLogger().Error(ctx, err)
 		return nil, err
 	}
-	return &httpproto.ConfirmTaskResp{}, nil
+	return &ConfirmTaskResp{}, nil
 }
 
 func NewRegistryService(reg *registry.Registry) *RegistryService {
@@ -97,7 +83,7 @@ type RegistryService struct {
 	reg *registry.Registry
 }
 
-func (s *RegistryService) RegisterTaskCallbackSrv(ctx context.Context, req *httpproto.RegisterTaskCallbackSrvReq) (*httpproto.RegisterTaskCallbackSrvResp, error) {
+func (s *RegistryService) RegisterTaskCallbackSrv(ctx context.Context, req *RegisterTaskCallbackSrvReq) (*RegisterTaskCallbackSrvResp, error) {
 	routes := []*task.TaskCallbackSrvRoute{
 		task.NewTaskCallbackSrvRoute("", req.Schema, req.Host, req.Port, req.CallbackTimeoutSec, req.IsEnableHealthCheck),
 	}
@@ -106,10 +92,10 @@ func (s *RegistryService) RegisterTaskCallbackSrv(ctx context.Context, req *http
 		logger.MustGetSessLogger().Error(ctx, err)
 		return nil, err
 	}
-	return &httpproto.RegisterTaskCallbackSrvResp{}, nil
+	return &RegisterTaskCallbackSrvResp{}, nil
 }
 
-func (s *RegistryService) UnregisterTaskCallbackSrv(ctx context.Context, req *httpproto.UnregisterTaskCallbackSrvReq) (*httpproto.UnregisterTaskCallbackSrvResp, error) {
+func (s *RegistryService) UnregisterTaskCallbackSrv(ctx context.Context, req *UnregisterTaskCallbackSrvReq) (*UnregisterTaskCallbackSrvResp, error) {
 	routes := []*task.TaskCallbackSrvRoute{
 		task.NewTaskCallbackSrvRoute("", req.Schema, req.Host, req.Port, 0, false),
 	}
@@ -118,5 +104,5 @@ func (s *RegistryService) UnregisterTaskCallbackSrv(ctx context.Context, req *ht
 		logger.MustGetSessLogger().Error(ctx, err)
 		return nil, err
 	}
-	return &httpproto.UnregisterTaskCallbackSrvResp{}, nil
+	return &UnregisterTaskCallbackSrvResp{}, nil
 }

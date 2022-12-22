@@ -2,7 +2,7 @@
   "is_cluster_mode": true,
   "cluster_name": "easy_task",
 
-  "task_worker_pool_size": 3,
+  "task_worker_pool_size": 50,
   "health_check_worker_pool_size": 100,
 
   "elect_driver": "redis",

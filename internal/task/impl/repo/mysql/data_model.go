@@ -3,7 +3,6 @@ package mysql
 import (
 	"errors"
 	"fmt"
-	"github.com/995933447/dbdriverutil/field"
 	"github.com/995933447/easytask/internal/task"
 	"gorm.io/plugin/soft_delete"
 	"strconv"
@@ -194,7 +193,7 @@ type TaskLogModel struct {
 	EndedAt int64 `json:"ended_at"`
 	TaskStatus int `json:"task_status"`
 	IsRunInAsync bool `json:"is_run_in_async"`
-	RespExtra field.Json `json:"resp_extra"`
+	RespExtra string `json:"resp_extra"`
 	RunTimes int `json:"try_times"`
 }
 

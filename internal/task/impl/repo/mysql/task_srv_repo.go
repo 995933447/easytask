@@ -17,20 +17,19 @@ type TaskSrvRepo struct {
 }
 
 func (r *TaskSrvRepo) AddSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv) error {
-	log := logger.MustGetRepoLogger()
 	conn := r.mustGetConn(ctx)
 	var srvModel TaskCallbackSrvModel
 	srvModel.Name = srv.GetName()
 	res := conn.Unscoped().Where(DbFieldName + " = ?", srv.GetName()).FirstOrCreate(&srvModel)
 	if res.Error != nil {
-		log.Error(ctx, res.Error)
+		logger.MustGetRepoLogger().Error(ctx, res.Error)
 		return res.Error
 	}
 
 	if res.RowsAffected == 0 && srvModel.DeletedAt > 0 {
 		err := conn.Unscoped().Model(&srvModel).Where(DbFieldId + " = ?", srvModel.Id).Update(DbFieldDeletedAt, 0).Error
 		if err != nil {
-			log.Error(ctx, err)
+			logger.MustGetRepoLogger().Error(ctx, err)
 			return err
 		}
 	}
@@ -56,7 +55,7 @@ func (r *TaskSrvRepo) AddSrvRoutes(ctx context.Context, srv *task.TaskCallbackSr
 			Where(DbFieldSrvSchema + " = ?", route.GetSchema()).
 			FirstOrCreate(&routeModel)
 		if res.Error != nil {
-			log.Error(ctx, res.Error)
+			logger.MustGetRepoLogger().Error(ctx, res.Error)
 			return res.Error
 		}
 
@@ -76,7 +75,7 @@ func (r *TaskSrvRepo) AddSrvRoutes(ctx context.Context, srv *task.TaskCallbackSr
 			Updates(updateMap).
 			Error
 		if err != nil {
-			log.Error(ctx, err)
+			logger.MustGetRepoLogger().Error(ctx, err)
 			return err
 		}
 	}
@@ -87,7 +86,7 @@ func (r *TaskSrvRepo) AddSrvRoutes(ctx context.Context, srv *task.TaskCallbackSr
 			Update(DbFieldHasEnableHealthCheck, true).
 			Error
 		if err != nil {
-			log.Error(ctx, err)
+			logger.MustGetRepoLogger().Error(ctx, err)
 			return err
 		}
 	}
@@ -99,11 +98,10 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 	var (
 		srvModel TaskCallbackSrvModel
 		conn     = r.mustGetConn(ctx)
-		log      = logger.MustGetRepoLogger()
 	)
 	err := conn.Where(DbFieldName+ " = ?", srv.GetName()).Take(&srvModel).Error
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetRepoLogger().Error(ctx, err)
 		return err
 	}
 
@@ -111,7 +109,7 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 	for _, route := range srv.GetRoutes() {
 		routeModelId, err := toCallbackSrvRouteModelId(route.GetId())
 		if err != nil {
-			log.Error(ctx, err)
+			logger.MustGetRepoLogger().Error(ctx, err)
 			return err
 		}
 		routeModelIds = append(routeModelIds, routeModelId)
@@ -121,7 +119,7 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 		Delete(&TaskCallbackSrvRouteModel{}).
 		Error
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetRepoLogger().Error(ctx, err)
 		return err
 	}
 
@@ -136,13 +134,13 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 		Take(&routeNums).
 		Error
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetRepoLogger().Error(ctx, err)
 		return err
 	}
 
 	if routeNums.Total == 0 {
 		if err = conn.Where(DbFieldId + " = ?", srvModel.Id).Delete(&TaskCallbackSrvModel{}).Error; err != nil {
-			log.Error(ctx, err)
+			logger.MustGetRepoLogger().Error(ctx, err)
 			return err
 		}
 		return nil
@@ -154,7 +152,7 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 			Update(DbFieldHasEnableHealthCheck, false).
 			Error
 		if err != nil {
-			log.Error(ctx, err)
+			logger.MustGetRepoLogger().Error(ctx, err)
 			return err
 		}
 	}
@@ -163,17 +161,14 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 }
 
 func (r *TaskSrvRepo) SetSrvRoutesPassHealthCheck(ctx context.Context, srv *task.TaskCallbackSrv) error {
-	var (
-		log      = logger.MustGetRepoLogger()
-		srvModel TaskCallbackSrvModel
-	)
+	var srvModel TaskCallbackSrvModel
 	if len(srv.GetRoutes()) == 0 {
 		return nil
 	}
 
 	conn := r.mustGetConn(ctx)
 	if err := conn.Where(DbFieldName+ " = ?", srv.GetName()).Take(&srvModel).Error; err != nil {
-		log.Error(ctx, err)
+		logger.MustGetRepoLogger().Error(ctx, err)
 		return err
 	}
 
@@ -181,7 +176,7 @@ func (r *TaskSrvRepo) SetSrvRoutesPassHealthCheck(ctx context.Context, srv *task
 	for _, route := range srv.GetRoutes() {
 		routeModelId, err := toTackCallbackSrvRouteModelId(route.GetId())
 		if err != nil {
-			log.Error(ctx, err)
+			logger.MustGetRepoLogger().Error(ctx, err)
 			return err
 		}
 		routeModelIds = append(routeModelIds, routeModelId)
@@ -194,7 +189,7 @@ func (r *TaskSrvRepo) SetSrvRoutesPassHealthCheck(ctx context.Context, srv *task
 			DbFieldCheckedHealthAt: now,
 		})
 	if res.Error != nil {
-		log.Error(ctx, res.Error)
+		logger.MustGetRepoLogger().Error(ctx, res.Error)
 		return res.Error
 	}
 
@@ -204,7 +199,7 @@ func (r *TaskSrvRepo) SetSrvRoutesPassHealthCheck(ctx context.Context, srv *task
 			DbFieldCheckedHealthAt: now,
 		})
 	if res.Error != nil {
-		log.Error(ctx, res.Error)
+		logger.MustGetRepoLogger().Error(ctx, res.Error)
 		return res.Error
 	}
 	return nil
@@ -223,7 +218,6 @@ func (r *TaskSrvRepo) GetSrvsByIds(ctx context.Context, ids []string) ([]*task.T
 }
 
 func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.QueryStream) ([]*task.TaskCallbackSrv, error) {
-	log := logger.MustGetRepoLogger()
 	conn :=  r.mustGetConn(ctx)
 	srvQueryScope := conn
 	err := optionstream.NewQueryStreamProcessor(queryStream).
@@ -232,7 +226,7 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 			for _, id := range val {
 				srvModelId, err := toTackCallbackSrvRouteModelId(id)
 				if err != nil {
-					log.Error(ctx, err)
+					logger.MustGetRepoLogger().Error(ctx, err)
 					return err
 				}
 				srvModelIds = append(srvModelIds, srvModelId)
@@ -250,14 +244,14 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 		}).
 		Process()
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetRepoLogger().Error(ctx, err)
 		return nil, err
 	}
 
 	var srvModels []*TaskCallbackSrvModel
 	err = srvQueryScope.Limit(int(queryStream.Limit)).Offset(int(queryStream.Offset)).Find(&srvModels).Error
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetRepoLogger().Error(ctx, err)
 		return nil, err
 	}
 
@@ -270,7 +264,7 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 	var routeModels []*TaskCallbackSrvRouteModel
 	err = conn.Where(DbFieldSrvId + " IN ?", srvModelIds).Find(&routeModels).Error
 	if err != nil {
-		log.Error(ctx, err)
+		logger.MustGetRepoLogger().Error(ctx, err)
 		return nil, err
 	}
 

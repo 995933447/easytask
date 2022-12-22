@@ -98,7 +98,6 @@ func TestApiServer(t *testing.T) {
 		}
 
 		t.Logf("req:%+v", req)
-		t.Log("arg:" + string(req.Arg))
 
 		resp := httpproto.TaskCallbackResp{
 			IsRunInAsync: true,

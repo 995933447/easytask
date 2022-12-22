@@ -33,7 +33,7 @@ func NewWorkerEngine(workerPoolSize uint, sched *Sched, callbackTaskSrvExec Task
 
 func (e *workerEngine) Run(ctx context.Context) {
 	e.createWorkerPool(ctx)
-	e.sched.Run(ctx)
+	e.sched.run(ctx)
 }
 
 func (e *workerEngine) createWorkerPool(ctx context.Context) {
@@ -43,14 +43,13 @@ func (e *workerEngine) createWorkerPool(ctx context.Context) {
 		go e.runWorker(ctx, i)
 		logger.MustGetSysLogger().Infof(ctx, "task worker(id:%d) running", i)
 	}
-	logger.MustGetSysLogger().Info(ctx, "created worker pool")
+	logger.MustGetSysLogger().Info(ctx, "finish creating worker pool")
 }
 
 func (e *workerEngine) runWorker(ctx context.Context, workerId uint) {
 	var (
 		traceModule = "task_worker"
 		origCtxTraceId string
-		log = logger.MustGetTaskLogger()
 	)
 	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
 		origCtxTraceId = traceCtx.GetTraceId()
@@ -58,12 +57,12 @@ func (e *workerEngine) runWorker(ctx context.Context, workerId uint) {
 	for {
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 
-		log.Infof(ctx, "worker(id:%d) is ready", workerId)
+		logger.MustGetSysLogger().Infof(ctx, "worker(id:%d) is ready", workerId)
 
-		task := e.sched.NextTask()
+		task := e.sched.nextTask()
 
 		if len(task.callbackSrv.GetRoutes()) == 0 {
-			log.Warnf(
+			logger.MustGetSysLogger().Warnf(
 				ctx,
 				"task(id:%s, name:%s) callback server(name:%s) has no routes",
 				task.id, task.name, task.callbackSrv.name,
@@ -71,37 +70,37 @@ func (e *workerEngine) runWorker(ctx context.Context, workerId uint) {
 			return
 		}
 
-		log.Infof(ctx, "worker(id:%d) run task(id:%s name:%s)", workerId, task.id, task.name)
+		logger.MustGetSysLogger().Infof(ctx, "worker(id:%d) run task(id:%s name:%s)", workerId, task.id, task.name)
 
 		now := time.Now()
 
-		locked, err := e.sched.LockTaskForRun(contxt.ChildOf(ctx), task)
+		locked, err := e.sched.lockTaskForRun(ctx, task)
 		if err != nil {
-			log.Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 			continue
 		}
 
 		if !locked {
-			log.Warnf(ctx, "worker(id:%d) lock task(id:%s) failed", workerId, task.id)
+			logger.MustGetSysLogger().Warnf(ctx, "worker(id:%d) lock task(id:%s) failed", workerId, task.id)
 			continue
 		}
 
-		taskResp, err := task.run(contxt.ChildOf(ctx), e.callbackTaskSrvExec)
+		taskResp, err := task.run(ctx, e.callbackTaskSrvExec)
 		if err != nil {
-			log.Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 			taskResp, err = newInternalErrTaskResp(task.id, err, now.Unix())
 			if err != nil {
-				log.Error(ctx, err)
+				logger.MustGetSysLogger().Error(ctx, err)
 				continue
 			}
 		}
 
-		err = e.sched.SubmitTaskResp(ctx, taskResp)
+		err = e.sched.submitTaskResp(ctx, taskResp)
 		if err != nil {
-			log.Error(ctx, err)
+			logger.MustGetSysLogger().Error(ctx, err)
 		}
 
-		log.Infof(
+		logger.MustGetSysLogger().Infof(
 			ctx,
 			"worker(id:%d) finish task(id:%s name:%s), exec time:%d ms",
 			workerId, task.id, task.name, time.Now().Sub(now) / time.Millisecond,

@@ -1,8 +1,15 @@
 package httpproto
 
 import (
+	"github.com/995933447/easytask/pkg/errs"
 	"github.com/995933447/easytask/pkg/rpc/proto"
 )
+
+type StdFmtResp struct {
+	Code errs.ErrCode `json:"code"`
+	Msg string `json:"msg"`
+	Data any `json:"data"`
+}
 
 type AddTaskReq struct {
 	Name string `json:"name"`
