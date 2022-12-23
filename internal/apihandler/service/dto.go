@@ -17,11 +17,11 @@ type AddTaskReq struct {
 }
 
 type AddTaskResp struct {
-	Id string
+	TaskId string
 }
 
 type StopTaskReq struct {
-	Id string
+	TaskId string
 }
 
 type StopTaskResp struct {

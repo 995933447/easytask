@@ -24,11 +24,11 @@ type AddTaskReq struct {
 }
 
 type AddTaskResp struct {
-	Id string `json:"id"`
+	TaskId string `json:"id"`
 }
 
 type StopTaskReq struct {
-	Id string `json:"id"`
+	TaskId string `json:"id"`
 }
 
 type StopTaskResp struct {

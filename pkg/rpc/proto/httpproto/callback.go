@@ -1,8 +1,8 @@
 package httpproto
 
 const (
-	HttpCallbackCmdTaskCallback = iota
-	HttpCallbackCmdTaskHeartBeat
+	CallbackCmdTaskCallback = iota
+	CallbackCmdTaskSrvHeartBeat
 )
 
 type TaskCallbackResp struct {
@@ -17,6 +17,7 @@ type TaskCallbackReq struct {
 	TaskName string `json:"task_name"`
 	Arg      string `json:"arg"`
 	RunTimes int    `json:"run_times"`
+	BizId 	string `json:"biz_id"`
 }
 
 type HeartBeatResp struct {

@@ -28,11 +28,12 @@ var _ task.TaskCallbackSrvExec = (*HttpExec)(nil)
 func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (*task.TaskCallbackSrvResp, error) {
 	var (
 		httpReq = &httpproto.TaskCallbackReq{
-			Cmd: 	  httpproto.HttpCallbackCmdTaskCallback,
+			Cmd: 	  httpproto.CallbackCmdTaskCallback,
 			TaskId:   oneTask.GetId(),
 			Arg:      oneTask.GetArg(),
 			TaskName: oneTask.GetName(),
 			RunTimes: oneTask.GetRunTimes(),
+			BizId:    oneTask.GetBizId(),
 		}
 		httpResp = &httpproto.TaskCallbackResp{}
 	)
@@ -70,7 +71,7 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (
 func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*task.HeartBeatResp, error) {
 	var (
 		httpReq = &httpproto.HeartBeatReq{
-			Cmd: httpproto.HttpCallbackCmdTaskHeartBeat,
+			Cmd: httpproto.CallbackCmdTaskSrvHeartBeat,
 		}
 		httpResp = &httpproto.HeartBeatResp{}
 	)

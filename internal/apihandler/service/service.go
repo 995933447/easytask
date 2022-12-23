@@ -48,11 +48,11 @@ func (s *TaskService) AddTask(ctx context.Context, req *AddTaskReq) (*AddTaskRes
 		return nil, err
 	}
 
-	return &AddTaskResp{Id: taskId}, nil
+	return &AddTaskResp{TaskId: taskId}, nil
 }
 
 func (s *TaskService) StopTask(ctx context.Context, req *StopTaskReq) (*StopTaskResp, error) {
-	if err := s.taskRepo.DelTaskById(ctx, req.Id); err != nil {
+	if err := s.taskRepo.DelTaskById(ctx, req.TaskId); err != nil {
 		logger.MustGetSessLogger().Error(ctx, err)
 		return nil, err
 	}
