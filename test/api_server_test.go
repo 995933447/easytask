@@ -142,7 +142,7 @@ func TestApiServer(t *testing.T) {
 			return
 		}
 
-		t.Logf("task id：%s", addTaskResp.Id)
+		t.Logf("task id：%s", addTaskResp.TaskId)
 	})
 
 	srvMux.HandleFunc("/add/task/once", func(writer http.ResponseWriter, request *http.Request) {
@@ -160,7 +160,7 @@ func TestApiServer(t *testing.T) {
 			return
 		}
 
-		t.Logf("task id：%s", addTaskResp.Id)
+		t.Logf("task id：%s", addTaskResp.TaskId)
 	})
 
 	srvMux.HandleFunc("/add/task/int", func(writer http.ResponseWriter, request *http.Request) {
@@ -177,7 +177,7 @@ func TestApiServer(t *testing.T) {
 			return
 		}
 
-		t.Logf("task id：%s", addTaskResp.Id)
+		t.Logf("task id：%s", addTaskResp.TaskId)
 	})
 
 	srv := &http.Server{

@@ -50,7 +50,7 @@ func (a *HttpApi) AddTask(ctx context.Context, req *httpproto.AddTaskReq) (*http
 	}
 
 	return &httpproto.AddTaskResp{
-		Id: addTaskResp.Id,
+		TaskId: addTaskResp.TaskId,
 	}, nil
 }
 
