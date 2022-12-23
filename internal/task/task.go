@@ -303,7 +303,7 @@ type NewTaskReq struct {
 	CallbackSrv *TaskCallbackSrv `validate:"required"`
 	CallbackPath string `json:"callback_path"`
 	Name string `validate:"required"`
-	Arg string `validate:"required"`
+	Arg string
 	RunTimes int
 	LastRunAt int64
 	AllowMaxRunTimes int

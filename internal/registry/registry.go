@@ -7,6 +7,7 @@ import (
 	"github.com/995933447/easytask/internal/util/errs"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/easytask/pkg/contxt"
+	bizerrs "github.com/995933447/easytask/pkg/errs"
 	"github.com/995933447/optionstream"
 	"github.com/995933447/simpletrace"
 	simpletracectx "github.com/995933447/simpletrace/context"
@@ -42,7 +43,7 @@ func NewRegistry(
 		checkHealthWorkerPoolSize: checkHealthWorkerPoolSize,
 		srvRepo: srvRepo,
 		callbackSrvExec: callbackSrvExec,
-		readyCheckSrvChan: make(chan *task.TaskCallbackSrv, 10000),
+		readyCheckSrvChan: make(chan *task.TaskCallbackSrv),
 		elect: elect,
 		isClusterMode: isClusterMode,
 	}
@@ -60,7 +61,7 @@ func (r *Registry) Discover(ctx context.Context, srvName string) (*task.TaskCall
 
 	if len(srvs) == 0 {
 		logger.MustGetRegistryLogger().Warnf(ctx, "task callback server(name:%s) not found", srvName)
-		return nil, errs.ErrTaskCallbackServerNotFound
+		return nil, bizerrs.NewBizErr(bizerrs.ErrCodeTaskCallbackSrvNotFound)
 	}
 
 	return srvs[0], nil

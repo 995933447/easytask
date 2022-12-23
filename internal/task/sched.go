@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"github.com/995933447/autoelect"
+	"github.com/995933447/easytask/internal/util/errs"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/995933447/simpletrace"
@@ -52,7 +53,8 @@ func (s *Sched) schedule(ctx context.Context) {
 	for {
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 		if s.isClusterMode && !s.elect.IsMaster() {
-			logger.MustGetSysLogger().Debugf(ctx, "not master")
+			err := errs.ErrCurrentNodeNoMaster
+			logger.MustGetRegistryLogger().Error(ctx, err)
 			time.Sleep(time.Second)
 			continue
 		}
@@ -126,7 +128,7 @@ func (s *Sched) submitTaskResp(ctx context.Context, resp *TaskResp) error {
 
 func NewSched(isClusterMode bool, taskRepo TaskRepo, elect autoelect.AutoElection) *Sched {
 	return &Sched{
-		taskCh: make(chan *Task, 10000),
+		taskCh: make(chan *Task),
 		taskRepo: taskRepo,
 		taskRespCh: make(chan *TaskResp),
 		elect: elect,

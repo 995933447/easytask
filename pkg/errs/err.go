@@ -34,6 +34,14 @@ func (e *BizError) Error() string {
 	return fmt.Sprintf("%d: %s", e.code, e.msg)
 }
 
+func (e *BizError) Code() ErrCode {
+	return e.code
+}
+
+func (e *BizError) Msg() string {
+	return e.msg
+}
+
 func NewBizErr(code ErrCode) *BizError {
 	return NewBizErrWithMsg(code, GetErrMsg(code))
 }

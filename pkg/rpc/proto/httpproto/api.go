@@ -9,6 +9,7 @@ type FinalStdoutResp struct {
 	Code errs.ErrCode `json:"code"`
 	Msg string `json:"msg"`
 	Data any `json:"data"`
+	Hint string `json:"hint"`
 }
 
 type AddTaskReq struct {

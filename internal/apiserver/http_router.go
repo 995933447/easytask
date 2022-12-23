@@ -128,13 +128,14 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 		}
 	}()
 
-	respErr := func(ctx context.Context, writer http.ResponseWriter, errCode errs.ErrCode, errMsg string, header map[string]string) {
+	respErr := func(ctx context.Context, writer http.ResponseWriter, errCode errs.ErrCode, errMsg, traceId string, header map[string]string) {
 		if errMsg == "" {
 			errMsg = errs.GetErrMsg(errCode)
 		}
 		content := httpproto.FinalStdoutResp{
 			Code: errCode,
 			Msg: errMsg,
+			Hint: traceId,
 		}
 		contentJson, err := json.Marshal(content)
 		if err != nil {
@@ -153,27 +154,29 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 			srvMux.HandleFunc(path, func(writer http.ResponseWriter, req *http.Request) {
 				var (
 					ctx context.Context
-					traceId = req.Header.Get(httpproto.HeaderSimpleTraceId)
-					spanId = req.Header.Get(httpproto.HeaderSimpleTraceSpanId)
-					parentSpanId = req.Header.Get(httpproto.HeaderSimpleTraceParentSpanId)
+					origTraceId = req.Header.Get(httpproto.HeaderSimpleTraceId)
 					traceModule = "api"
 				)
-				if traceId != "" {
+				if req.Header.Get(httpproto.HeaderSimpleTraceId) != "" {
 					ctx = contxt.NewWithTrace(
 						traceModule,
-						contxt.NewWithTrace(traceModule, req.Context(), traceId, parentSpanId),
-						traceId,
-						spanId,
+						contxt.NewWithTrace(traceModule, req.Context(), origTraceId, req.Header.Get(httpproto.HeaderSimpleTraceParentSpanId)),
+						origTraceId,
+						req.Header.Get(httpproto.HeaderSimpleTraceSpanId),
 						)
 				} else {
 					ctx = contxt.New(traceModule, req.Context())
 				}
 
-				respHeader := map[string]string{
-					"Content-Type": "application/json",
-				}
+				var (
+					traceId string
+					respHeader = map[string]string{
+						"Content-Type": "application/json",
+					}
+				)
 				if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
-					respHeader[httpproto.HeaderSimpleTraceId] = traceCtx.GetTraceId()
+					traceId = traceCtx.GetTraceId()
+					respHeader[httpproto.HeaderSimpleTraceId] = traceId
 					respHeader[httpproto.HeaderSimpleTraceSpanId] = traceCtx.GetSpanId()
 					respHeader[httpproto.HeaderSimpleTraceParentSpanId] = traceCtx.GetParentSpanId()
 				}
@@ -188,7 +191,7 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 
 				handlerReflec, ok := methodToHandlerMap[req.Method]
 				if !ok {
-					respErr(ctx, writer, errs.ErrCodeRouteMethodNotAllow, "", respHeader)
+					respErr(ctx, writer, errs.ErrCodeRouteMethodNotAllow, "", traceId, respHeader)
 					return
 				}
 
@@ -198,13 +201,13 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 				case http.MethodPost:
 					if err := httpCtx.PostArg(handleReq.Interface()); err != nil {
 						logger.MustGetSessLogger().Error(ctx, err)
-						respErr(ctx, writer, errs.ErrCodeArgsInvalid, "", respHeader)
+						respErr(ctx, writer, errs.ErrCodeArgsInvalid, "", traceId, respHeader)
 						return
 					}
 				case http.MethodGet:
 					if err := httpCtx.GetArg(handleReq.Interface()); err != nil {
 						logger.MustGetSessLogger().Error(ctx, err)
-						respErr(ctx, writer, errs.ErrCodeArgsInvalid, "", respHeader)
+						respErr(ctx, writer, errs.ErrCodeArgsInvalid, "", traceId, respHeader)
 						return
 					}
 				}
@@ -213,7 +216,7 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 
 				if err := validator.New().Struct(handleReq.Interface()); err != nil {
 					logger.MustGetSessLogger().Error(ctx, err)
-					respErr(ctx, writer, errs.ErrCodeArgsInvalid, err.Error(), respHeader)
+					respErr(ctx, writer, errs.ErrCodeArgsInvalid, err.Error(), traceId, respHeader)
 					return
 				}
 
@@ -221,20 +224,25 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 				replyErr := replies[1].Interface()
 				if replyErr != nil {
 					logger.MustGetSessLogger().Error(ctx, replyErr)
-					respErr(ctx, writer, errs.ErrCodeInternal, "", respHeader)
+					if bizErr, ok := replyErr.(*errs.BizError); ok {
+						respErr(ctx, writer, bizErr.Code(), bizErr.Msg(), traceId, respHeader)
+						return
+					}
+					respErr(ctx, writer, errs.ErrCodeInternal, "", traceId, respHeader)
 					return
 				}
 
 				resp := &httpproto.FinalStdoutResp{
 					Data: replies[0].Interface(),
+					Hint: traceId,
 				}
 				respJson, err := json.Marshal(resp)
 				if err != nil {
 					logger.MustGetSessLogger().Error(ctx, err)
 					if handleErr, ok := err.(*HandleErr); ok {
-						respErr(ctx, writer, handleErr.errCode, "", respHeader)
+						respErr(ctx, writer, handleErr.errCode, "", traceId, respHeader)
 					} else {
-						respErr(ctx, writer, errs.ErrCodeInternal, "", respHeader)
+						respErr(ctx, writer, errs.ErrCodeInternal, "", traceId, respHeader)
 					}
 					return
 				}
@@ -261,8 +269,6 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 }
 
 func (r *HttpRouter) writeResp(ctx context.Context, writer http.ResponseWriter, code int, content []byte, header map[string]string) error {
-	writer.WriteHeader(code)
-
 	defer func() {
 		var headerLine string
 		for key, val := range header {
@@ -274,6 +280,8 @@ func (r *HttpRouter) writeResp(ctx context.Context, writer http.ResponseWriter, 
 	for key, val := range header {
 		writer.Header().Set(key, val)
 	}
+
+	writer.WriteHeader(code)
 
 	var (
 		contentLen = len(content)
