@@ -5,7 +5,6 @@ services:
     build: ./mysql
     volumes:
       - ${MYSQL_DATA_DIR}:/var/lib/mysql
-      - ${APOLLO_SCRIPTS_DIR}:/sql
     ports:
       - ${MYSQL_PORT}:3306
 
