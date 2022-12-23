@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"github.com/995933447/autoelect"
 	electfactory "github.com/995933447/autoelect/factory"
 	"github.com/995933447/confloader"
@@ -21,8 +20,6 @@ import (
 	"github.com/etcd-io/etcd/client"
 	"os"
 	"os/signal"
-	"runtime/debug"
-	"strings"
 	"syscall"
 	"time"
 )
