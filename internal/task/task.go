@@ -199,9 +199,8 @@ type Task struct {
 	timeCronExpr string
 	timeIntervalSec int
 	timeSpecAt int64
+	bizId string
 }
-
-var ErrUnknownSchedAt = errors.New("unknown schedule at")
 
 func (t *Task) GetSchedNextAt() (int64, error) {
 	now := time.Now()
@@ -217,7 +216,11 @@ func (t *Task) GetSchedNextAt() (int64, error) {
 	case SchedModeTimeSpec:
 		return t.timeSpecAt, nil
 	}
-	return 0, ErrUnknownSchedAt
+	return 0, errors.New("unknown schedule at")
+}
+
+func (t *Task) GetBizId() string {
+	return t.bizId
 }
 
 func (t *Task) GetTimeIntervalSec() int {
@@ -309,6 +312,7 @@ type NewTaskReq struct {
 	TimeCronExpr string
 	TimeIntervalSec int
 	TimeSpecAt int64
+	BizId string
 }
 
 func (r *NewTaskReq) Check() error {
@@ -334,6 +338,7 @@ func NewTask(req *NewTaskReq) (*Task, error) {
 		timeCronExpr: req.TimeCronExpr,
 		timeIntervalSec: req.TimeIntervalSec,
 		timeSpecAt: req.TimeSpecAt,
+		bizId: req.BizId,
 	}, nil
 }
 

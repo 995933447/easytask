@@ -5,7 +5,7 @@ import (
 	"github.com/995933447/distribmu"
 	"github.com/995933447/distribmu/factory"
 	"github.com/995933447/log-go"
-	"github.com/995933447/log-go/impls/loggerwriters"
+	"github.com/995933447/log-go/impl/loggerwriter"
 	"github.com/995933447/redisgroup"
 	"github.com/995933447/std-go/print"
 	"testing"
@@ -15,7 +15,7 @@ import (
 func TestRedis(t *testing.T) {
 	redis := redisgroup.NewGroup([]*redisgroup.Node{
 		redisgroup.NewNode("127.0.0.1", 6379, ""),
-	}, log.NewLogger(loggerwriters.NewStdoutLoggerWriter(print.ColorBlue)))
+	}, log.NewLogger(loggerwriter.NewStdoutLoggerWriter(print.ColorBlue)))
 	err := redis.Set(context.Background(), "abcd", []byte("123"), time.Minute)
 	if err != nil {
 		t.Error(err)
@@ -26,7 +26,7 @@ func TestRedis(t *testing.T) {
 func TestRedisGroupMuLock(t *testing.T) {
 	redisGroup := redisgroup.NewGroup([]*redisgroup.Node{
 		redisgroup.NewNode("127.0.0.1", 6379, ""),
-	}, log.NewLogger(loggerwriters.NewStdoutLoggerWriter(print.ColorBlue)))
+	}, log.NewLogger(loggerwriter.NewStdoutLoggerWriter(print.ColorBlue)))
 
 	muCfg := factory.NewMuConf(
 		factory.MuTypeRedis,

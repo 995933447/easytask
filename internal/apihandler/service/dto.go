@@ -13,6 +13,7 @@ type AddTaskReq struct {
 	TimeIntervalSec int
 	TimeSpecAt int64
 	Arg string
+	BizId string
 }
 
 type AddTaskResp struct {

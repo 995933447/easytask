@@ -4,8 +4,10 @@ import (
 	"context"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/easytask/pkg/errs"
 	"github.com/995933447/optionstream"
 	"github.com/995933447/reflectutil"
+	"gorm.io/gorm"
 	"sync/atomic"
 	"time"
 )
@@ -18,8 +20,9 @@ type TaskSrvRepo struct {
 
 func (r *TaskSrvRepo) AddSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv) error {
 	conn := r.mustGetConn(ctx)
-	var srvModel TaskCallbackSrvModel
-	srvModel.Name = srv.GetName()
+	srvModel := TaskCallbackSrvModel{
+		Name: srv.GetName(),
+	}
 	res := conn.Unscoped().Where(DbFieldName + " = ?", srv.GetName()).FirstOrCreate(&srvModel)
 	if res.Error != nil {
 		logger.MustGetRepoLogger().Error(ctx, res.Error)
@@ -99,9 +102,12 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 		srvModel TaskCallbackSrvModel
 		conn     = r.mustGetConn(ctx)
 	)
-	err := conn.Where(DbFieldName+ " = ?", srv.GetName()).Take(&srvModel).Error
+	err := conn.Where(DbFieldName + " = ?", srv.GetName()).Take(&srvModel).Error
 	if err != nil {
 		logger.MustGetRepoLogger().Error(ctx, err)
+		if err == gorm.ErrRecordNotFound {
+			return errs.NewBizErr(errs.ErrCodeTaskCallbackSrvNotFound)
+		}
 		return err
 	}
 
@@ -161,14 +167,17 @@ func(r *TaskSrvRepo) DelSrvRoutes(ctx context.Context, srv *task.TaskCallbackSrv
 }
 
 func (r *TaskSrvRepo) SetSrvRoutesPassHealthCheck(ctx context.Context, srv *task.TaskCallbackSrv) error {
-	var srvModel TaskCallbackSrvModel
 	if len(srv.GetRoutes()) == 0 {
 		return nil
 	}
 
 	conn := r.mustGetConn(ctx)
-	if err := conn.Where(DbFieldName+ " = ?", srv.GetName()).Take(&srvModel).Error; err != nil {
+	var srvModel TaskCallbackSrvModel
+	if err := conn.Where(DbFieldName + " = ?", srv.GetName()).Take(&srvModel).Error; err != nil {
 		logger.MustGetRepoLogger().Error(ctx, err)
+		if err == gorm.ErrRecordNotFound {
+			return errs.NewBizErr(errs.ErrCodeTaskCallbackSrvNotFound)
+		}
 		return err
 	}
 

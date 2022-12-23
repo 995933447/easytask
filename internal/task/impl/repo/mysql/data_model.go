@@ -34,9 +34,8 @@ type BaseModel struct {
 
 type TaskModel struct {
 	BaseModel
-	Name string
+	Name string `gorm:"index:task_biz,unique"`
 	Arg string
-	Status int
 	LastRunAt int64
 	PlanSchedNextAt int64
 	TimeCronExpr string
@@ -50,6 +49,7 @@ type TaskModel struct {
 	AllowMaxRunTimes int
 	MaxRunTimeSec int
 	CallbackPath string
+	BizId string `gorm:"index:task_biz,unique"`
 }
 
 func (*TaskModel) TableName() string {
@@ -73,6 +73,7 @@ func (t *TaskModel) toEntity(callbackSrv *task.TaskCallbackSrv) (*task.Task, err
 		TimeIntervalSec: t.TimeIntervalSec,
 		TimeCronExpr: t.TimeCronExpr,
 		SchedMode: entitySchedMode,
+		BizId: t.BizId,
 	})
 }
 
@@ -118,7 +119,7 @@ func toTaskModelId(entityId string) (uint64, error) {
 
 type TaskCallbackSrvModel struct {
 	BaseModel
-	Name string
+	Name string `gorm:"index:server_name,unique"`
 	CheckedHealthAt int64
 	HasEnableHealthCheck bool
 }
@@ -145,10 +146,10 @@ func toTaskCallbackSrvModelId(entity *task.TaskCallbackSrv) (uint64, error) {
 
 type TaskCallbackSrvRouteModel struct {
 	BaseModel
-	SrvSchema string
-	Host string
-	Port int
-	SrvId uint64
+	SrvSchema string `gorm:"index:route_addr,unique"`
+	Host string `gorm:"index:route_addr,unique"`
+	Port int `gorm:"index:route_addr,unique"`
+	SrvId uint64 `gorm:"index:route_addr,unique"`
 	CallbackTimeoutSec int
 	CheckedHealthAt int64
 	EnableHealthCheck bool

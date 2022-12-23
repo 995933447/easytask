@@ -7,6 +7,7 @@ import (
 	"fmt"
 	internalerr "github.com/995933447/easytask/internal/util/errs"
 	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/easytask/internal/util/runtime"
 	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/995933447/easytask/pkg/errs"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
@@ -131,7 +132,7 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 		if errMsg == "" {
 			errMsg = errs.GetErrMsg(errCode)
 		}
-		content := httpproto.StdFmtResp{
+		content := httpproto.FinalStdoutResp{
 			Code: errCode,
 			Msg: errMsg,
 		}
@@ -176,6 +177,8 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 					respHeader[httpproto.HeaderSimpleTraceSpanId] = traceCtx.GetSpanId()
 					respHeader[httpproto.HeaderSimpleTraceParentSpanId] = traceCtx.GetParentSpanId()
 				}
+
+				defer runtime.RecoverToTraceAndExit(ctx)
 
 				logger.MustGetSessLogger().Infof(
 					ctx,
@@ -222,7 +225,7 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 					return
 				}
 
-				resp := &httpproto.StdFmtResp{
+				resp := &httpproto.FinalStdoutResp{
 					Data: replies[0].Interface(),
 				}
 				respJson, err := json.Marshal(resp)

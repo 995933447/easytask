@@ -42,6 +42,7 @@ func (a *HttpApi) AddTask(ctx context.Context, req *httpproto.AddTaskReq) (*http
 		TimeIntervalSec: req.TimeIntervalSec,
 		TimeCron: req.TimeCron,
 		Arg: req.Arg,
+		BizId: req.BizId,
 	})
 	if err != nil {
 		logger.MustGetSessLogger().Error(ctx, err)

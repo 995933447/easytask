@@ -1,0 +1,18 @@
+version: "3.3"
+
+services:
+  mysql:
+    build: ./mysql
+    volumes:
+      - ${MYSQL_DATA_DIR}:/var/lib/mysql
+      - ${APOLLO_SCRIPTS_DIR}:/sql
+    ports:
+      - ${MYSQL_PORT}:3306
+
+  redis:
+    build: ./redis
+    volumes:
+      - ${REDIS_DATA_DIR}:/data
+    ports:
+      - ${REDIS_PORT}:6379
+

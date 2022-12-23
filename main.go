@@ -13,6 +13,7 @@ import (
 	"github.com/995933447/easytask/internal/task/impl/callback"
 	mysqlrepo "github.com/995933447/easytask/internal/task/impl/repo/mysql"
 	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/easytask/internal/util/runtime"
 	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/995933447/log-go"
 	"github.com/995933447/redisgroup"
@@ -78,7 +79,7 @@ func main() {
 
 	logger.MustGetSysLogger().Info(ctx, "easytask starting...")
 
-	defer recoverPanic(ctx)
+	defer runtime.RecoverToTraceAndExit(ctx)
 
 	elect, errDuringElect, err := startElect(ctx, conf)
 	if err != nil {
@@ -117,23 +118,6 @@ func main() {
 
 	if err = runHttpApiServer(ctx, conf, taskRepo, reg); err != nil {
 		panic(any(err))
-	}
-}
-
-func recoverPanic(ctx context.Context) {
-	if err := recover(); err != nil {
-		fmt.Println(err)
-		logger.MustGetSysLogger().Errorf(ctx, "PROCESS PANIC: err %s", err)
-		stack := debug.Stack()
-		if len(stack) > 0 {
-			lines := strings.Split(string(stack), "\n")
-			for _, line := range lines {
-				fmt.Println(line)
-				logger.MustGetSysLogger().Error(ctx, line)
-			}
-		}
-		logger.MustGetSysLogger().Errorf(ctx, "stack is empty (%s)", err)
-		os.Exit(0)
 	}
 }
 

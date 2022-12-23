@@ -1,5 +1,7 @@
 package errs
 
+import "fmt"
+
 type ErrCode int
 
 const (
@@ -21,4 +23,24 @@ var errMap = map[ErrCode]string{
 
 func GetErrMsg(code ErrCode) string {
 	return errMap[code]
+}
+
+type BizError struct {
+	code ErrCode
+	msg string
+}
+
+func (e *BizError) Error() string {
+	return fmt.Sprintf("%d: %s", e.code, e.msg)
+}
+
+func NewBizErr(code ErrCode) *BizError {
+	return NewBizErrWithMsg(code, GetErrMsg(code))
+}
+
+func NewBizErrWithMsg(code ErrCode, msg string) *BizError {
+	return &BizError{
+		code: code,
+		msg: msg,
+	}
 }

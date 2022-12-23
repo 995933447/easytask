@@ -135,6 +135,7 @@ func TestApiServer(t *testing.T) {
 			SchedMode: proto.SchedModeTimeCron,
 			TimeCron:  "*/3 * * * *",
 			Arg: `{"hello":"world"}`,
+			BizId: "1",
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -152,6 +153,7 @@ func TestApiServer(t *testing.T) {
 			SchedMode: proto.SchedModeTimeSpec,
 			TimeSpecAt: time.Now().Add(time.Minute).Unix(),
 			Arg: `{"hello":"world"}`,
+			BizId: "2",
 		})
 		if err != nil {
 			t.Fatal(err)

@@ -3,7 +3,7 @@ package logger
 import (
 	"context"
 	"github.com/995933447/log-go"
-	"github.com/995933447/log-go/impls/loggerwriters"
+	"github.com/995933447/log-go/impl/loggerwriter"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -126,11 +126,11 @@ func MustGetCallbackLogger() Logger {
 }
 
 func NewLogger(baseDir string, maxFileSize int64, level string) Logger {
-	writer := loggerwriters.NewFileLoggerWriter(
+	writer := loggerwriter.NewFileLoggerWriter(
 		baseDir,
 		maxFileSize,
 		5,
-		loggerwriters.OpenNewFileByByDateHour,
+		loggerwriter.OpenNewFileByByDateHour,
 		100000,
 		)
 	go func() {

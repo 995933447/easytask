@@ -22,6 +22,10 @@ github.com/995933447/log-go v0.0.0-20221222102517-2cc7a8128ac8 h1:vaH35Hpu7qMeSg
 github.com/995933447/log-go v0.0.0-20221222102517-2cc7a8128ac8/go.mod h1:QOlOZqjgS3Vqt/cc+NKcryIMJwWwgYg8qs1BTMAZJTQ=
 github.com/995933447/log-go v0.0.0-20221222104637-f27b34e27ceb h1:HA8iCxIK1KSsng7f4cRvF54EsIw2ymOpuYV0kdyX4ec=
 github.com/995933447/log-go v0.0.0-20221222104637-f27b34e27ceb/go.mod h1:QOlOZqjgS3Vqt/cc+NKcryIMJwWwgYg8qs1BTMAZJTQ=
+github.com/995933447/log-go v0.0.0-20221223062313-41cd6bfc67dd h1:Ea+KsuG7JDCCjoJv6tZVhFe8FJOVxXJM3sVKG8TWpb0=
+github.com/995933447/log-go v0.0.0-20221223062313-41cd6bfc67dd/go.mod h1:QOlOZqjgS3Vqt/cc+NKcryIMJwWwgYg8qs1BTMAZJTQ=
+github.com/995933447/log-go v0.0.0-20221223065909-8528fb00c021 h1:d1SdSalUFxYTiTFWffPIet72jtID9TPtBocl7gx2Z1Q=
+github.com/995933447/log-go v0.0.0-20221223065909-8528fb00c021/go.mod h1:QOlOZqjgS3Vqt/cc+NKcryIMJwWwgYg8qs1BTMAZJTQ=
 github.com/995933447/optionstream v0.0.0-20220816081607-a125989b4cd9 h1:AfkqCqx1ErZdP8AZ0gfoHpXpgStXTiYob9ljd495xZ0=
 github.com/995933447/optionstream v0.0.0-20220816081607-a125989b4cd9/go.mod h1:RCOWvoFza1fFDDffsoqbDmT+FdN581c3QFu84xoqWfA=
 github.com/995933447/redisgroup v0.0.0-20220803160352-e08d00f81719 h1:33p2LYh5dxw+PEDq+24i2tJwTVq0M2vLCMZbGxguPrw=

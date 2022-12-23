@@ -35,6 +35,7 @@ func (s *TaskService) AddTask(ctx context.Context, req *AddTaskReq) (*AddTaskRes
 		TimeSpecAt: req.TimeSpecAt,
 		TimeCronExpr: req.TimeCron,
 		TimeIntervalSec: req.TimeIntervalSec,
+		BizId: req.BizId,
 	})
 	if err != nil {
 		logger.MustGetSessLogger().Error(ctx, err)

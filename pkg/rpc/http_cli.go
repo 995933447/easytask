@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/995933447/easytask/pkg/contxt"
+	"github.com/995933447/easytask/pkg/errs"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
 	simpletracectx "github.com/995933447/simpletrace/context"
 	"io"
@@ -112,9 +113,15 @@ func (c *HttpCli) post(ctx context.Context, path string, req, resp any, opts ...
 		return err
 	}
 
-	err = json.Unmarshal(httpRespBody, resp)
+	var formattedResp httpproto.FinalStdoutResp
+	formattedResp.Data = resp
+	err = json.Unmarshal(httpRespBody, &formattedResp)
 	if err != nil {
 		return err
+	}
+
+	if formattedResp.Code > 0 {
+		return errs.NewBizErrWithMsg(formattedResp.Code, formattedResp.Msg)
 	}
 
 	return nil

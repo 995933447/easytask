@@ -5,7 +5,7 @@ import (
 	"github.com/995933447/easytask/pkg/rpc/proto"
 )
 
-type StdFmtResp struct {
+type FinalStdoutResp struct {
 	Code errs.ErrCode `json:"code"`
 	Msg string `json:"msg"`
 	Data any `json:"data"`
@@ -20,6 +20,7 @@ type AddTaskReq struct {
 	TimeIntervalSec int `json:"time_interval_sec"`
 	TimeSpecAt int64 `json:"time_spec_at"`
 	Arg string `json:"arg"`
+	BizId string `json:"biz_id"`
 }
 
 type AddTaskResp struct {

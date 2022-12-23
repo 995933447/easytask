@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/easytask/pkg/errs"
 	"github.com/995933447/reflectutil"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -43,6 +44,9 @@ func (r *TaskRepo) GetTaskById(ctx context.Context, id string) (*task.Task, erro
 	var taskModel TaskModel
 	if err := r.mustGetConn(ctx).Where(DbFieldId, taskModelId).Take(&taskModel).Error; err != nil {
 		logger.MustGetRepoLogger().Error(ctx, err)
+		if err == gorm.ErrRecordNotFound {
+			return nil, errs.NewBizErr(errs.ErrCodeTaskNotFound)
+		}
 		return nil, err
 	}
 
@@ -55,7 +59,7 @@ func (r *TaskRepo) GetTaskById(ctx context.Context, id string) (*task.Task, erro
 
 	if len(srvs) == 0 {
 		logger.MustGetRepoLogger().Warnf(ctx, "get TaskCallbackSrv(id:%s) is empty", srvId)
-		return nil, gorm.ErrRecordNotFound
+		return nil, errs.NewBizErr(errs.ErrCodeTaskCallbackSrvNotFound)
 	}
 
 	srv := srvs[0]
@@ -120,10 +124,10 @@ func (r *TaskRepo) AddTask(ctx context.Context, oneTask *task.Task) (string, err
 		allowMaxRunTimes = math.MaxInt
 	}
 
+	conn := r.mustGetConn(ctx)
 	taskModel := &TaskModel{
 		Name:             oneTask.GetName(),
 		Arg:              oneTask.GetArg(),
-		Status:           statusReady,
 		SchedMode:        schedModel,
 		TimeCronExpr:     oneTask.GetTimeCronExpr(),
 		TimeIntervalSec:  oneTask.GetTimeIntervalSec(),
@@ -131,11 +135,37 @@ func (r *TaskRepo) AddTask(ctx context.Context, oneTask *task.Task) (string, err
 		AllowMaxRunTimes: allowMaxRunTimes,
 		CallbackPath:     oneTask.GetCallbackPath(),
 		CallbackSrvId:    srvId,
+		BizId: 			  oneTask.GetBizId(),
+		MaxRunTimeSec:    oneTask.GetTimeIntervalSec(),
 	}
-	err = r.mustGetConn(ctx).Create(taskModel).Error
-	if err != nil {
-		logger.MustGetRepoLogger().Error(ctx, err)
+	res := conn.Unscoped().
+		Where(DbFieldName + " = ?", taskModel.Name).
+		Where(DbFieldBizId + " = ?", taskModel.BizId).
+		FirstOrCreate(taskModel)
+	if res.Error != nil {
+		logger.MustGetRepoLogger().Error(ctx, res.Error)
 		return "", err
+	}
+
+	if res.RowsAffected == 0 {
+		err = conn.Model(taskModel).
+			Unscoped().
+			Where(DbFieldId + " = ?", taskModel.Id).
+			Updates(map[string]interface{}{
+				DbFieldSchedMode: taskModel.SchedMode,
+				DbFieldTimeCronExpr: taskModel.TimeCronExpr,
+				DbFieldTimeIntervalSec: taskModel.TimeIntervalSec,
+				DbFieldPlanSchedNextAt: taskModel.PlanSchedNextAt,
+				DbFieldCallbackSrvId: taskModel.CallbackSrvId,
+				DbFieldCallbackPath: taskModel.CallbackPath,
+				DbFieldAllowMaxRunTimes: taskModel.AllowMaxRunTimes,
+				DbFieldMaxRunTimeSec: taskModel.MaxRunTimeSec,
+				DbFieldDeletedAt: 0,
+			}).Error
+		if err != nil {
+			logger.MustGetRepoLogger().Error(ctx, err)
+			return "", err
+		}
 	}
 
 	return taskModel.toEntityId(), nil
@@ -240,7 +270,6 @@ func (r *TaskRepo) TimeoutTasks(ctx context.Context, size int, cursor string) ([
 	var nextCursor string
 	if len(tasks) > 0 {
 		nextCursor = tasks[len(tasks) - 1].GetId()
-		logger.MustGetRepoLogger().Debugf(ctx, "next cursor:%s", nextCursor)
 	}
 
 	return tasks, nextCursor, nil

@@ -2,6 +2,11 @@
 package mysql
 
 const (
+	DbFieldbaseLogger = "base_logger"
+	DbFieldslowThreshold = "slow_threshold"
+	DbFieldconnDsn = "conn_dsn"
+	DbFieldconn = "conn"
+	DbFieldconnMu = "conn_mu"
 	DbFielddb = "db"
 	DbFieldsrvRepo = "srv_repo"
 	DbFielddefaultTaskMaxRunTimeSec = "default_task_max_run_time_sec"
@@ -11,7 +16,6 @@ const (
 	DbFieldDeletedAt = "deleted_at"
 	DbFieldName = "name"
 	DbFieldArg = "arg"
-	DbFieldStatus = "status"
 	DbFieldLastRunAt = "last_run_at"
 	DbFieldPlanSchedNextAt = "plan_sched_next_at"
 	DbFieldTimeCronExpr = "time_cron_expr"
@@ -25,6 +29,7 @@ const (
 	DbFieldAllowMaxRunTimes = "allow_max_run_times"
 	DbFieldMaxRunTimeSec = "max_run_time_sec"
 	DbFieldCallbackPath = "callback_path"
+	DbFieldBizId = "biz_id"
 	DbFieldCheckedHealthAt = "checked_health_at"
 	DbFieldHasEnableHealthCheck = "has_enable_health_check"
 	DbFieldSrvSchema = "srv_schema"
@@ -38,10 +43,4 @@ const (
 	DbFieldEndedAt = "ended_at"
 	DbFieldTaskStatus = "task_status"
 	DbFieldRespExtra = "resp_extra"
-	DbFieldTryTimes = "try_times"
-	DbFieldbaseLogger = "base_logger"
-	DbFieldslowThreshold = "slow_threshold"
-	DbFieldconnDsn = "conn_dsn"
-	DbFieldconn = "conn"
-	DbFieldconnMu = "conn_mu"
 )
