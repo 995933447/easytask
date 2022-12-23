@@ -13,7 +13,7 @@ type TaskCallbackResp struct {
 
 type TaskCallbackReq struct {
 	Cmd int `json:"cmd"`
-	TaskId string `json:"id"`
+	TaskId string `json:"task_id"`
 	TaskName string `json:"task_name"`
 	Arg      string `json:"arg"`
 	RunTimes int    `json:"run_times"`
