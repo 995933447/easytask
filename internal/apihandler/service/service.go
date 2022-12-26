@@ -97,10 +97,20 @@ func (s *RegistryService) RegisterTaskCallbackSrv(ctx context.Context, req *Regi
 }
 
 func (s *RegistryService) UnregisterTaskCallbackSrv(ctx context.Context, req *UnregisterTaskCallbackSrvReq) (*UnregisterTaskCallbackSrvResp, error) {
-	routes := []*task.TaskCallbackSrvRoute{
-		task.NewTaskCallbackSrvRoute("", req.Schema, req.Host, req.Port, 0, false),
+	srv, err := s.reg.Discover(ctx, req.Name)
+	if err != nil {
+		logger.MustGetSessLogger().Error(ctx, err)
+		return nil, err
 	}
-	err := s.reg.Unregister(ctx, task.NewTaskCallbackSrv("", req.Name, routes, false))
+
+	var readyDelRoutes []*task.TaskCallbackSrvRoute
+	for _, route := range srv.GetRoutes() {
+		if route.GetHost() == req.Host && route.GetSchema() == req.Schema && route.GetPort() == req.Port {
+			readyDelRoutes = append(readyDelRoutes, route)
+		}
+	}
+
+	err = s.reg.Unregister(ctx, task.NewTaskCallbackSrv(srv.GetId(), srv.GetName(), readyDelRoutes, srv.HasEnableHealthCheckRoute()))
 	if err != nil {
 		logger.MustGetSessLogger().Error(ctx, err)
 		return nil, err

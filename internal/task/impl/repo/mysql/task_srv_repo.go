@@ -248,7 +248,11 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 			return nil
 		}).
 		OnInt64(task.QueryOptKeyCheckedHealthLt, func(val int64) error {
-			srvQueryScope = srvQueryScope.Where(DbFieldCheckedHealthAt+ " < ?", val)
+			srvQueryScope = srvQueryScope.Where(DbFieldCheckedHealthAt + " < ?", val)
+			return nil
+		}).
+		OnString(task.QueryOptKeyEqName, func(val string) error {
+			srvQueryScope = srvQueryScope.Where(DbFieldName + " = ?", val)
 			return nil
 		}).
 		Process()

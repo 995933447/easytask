@@ -85,7 +85,7 @@ func (r *Registry) Unregister(ctx context.Context, srv *task.TaskCallbackSrv) er
 	return nil
 }
 
-func (r *Registry) HeathCheck(ctx context.Context) error {
+func (r *Registry) HealthCheck(ctx context.Context) error {
 	if r.isClusterMode && !r.elect.IsMaster() {
 		err := errs.ErrCurrentNodeNoMaster
 		logger.MustGetRegistryLogger().Error(ctx, err)
@@ -141,7 +141,7 @@ func (r *Registry) sched(ctx context.Context) {
 
 		logger.MustGetRegistryLogger().Debug(ctx, "checking health")
 
-		if err := r.HeathCheck(ctx); err != nil {
+		if err := r.HealthCheck(ctx); err != nil {
 			logger.MustGetRegistryLogger().Error(ctx, err)
 		}
 
