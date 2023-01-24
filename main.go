@@ -106,16 +106,18 @@ func main() {
 	sysSignCh := make(chan os.Signal)
 	stopApiSrvSignCh := make(chan struct{})
 	go func() {
-		_ = <- sysSignCh
-		elect.StopElect()
-		logger.MustGetSysLogger().Debug(ctx, "stopped elect")
-		reg.Stop()
-		logger.MustGetSysLogger().Debug(ctx, "stopped registry")
-		workerEngine.Stop()
-		logger.MustGetSysLogger().Debug(ctx, "stopped worker engine")
-		stopApiSrvSignCh <- struct{}{}
-		logger.MustGetSysLogger().Debug(ctx, "stopped server")
-		os.Exit(0)
+		for {
+			_ = <- sysSignCh
+			elect.StopElect()
+			logger.MustGetSysLogger().Debug(ctx, "stopped elect")
+			reg.Stop()
+			logger.MustGetSysLogger().Debug(ctx, "stopped registry")
+			workerEngine.Stop()
+			logger.MustGetSysLogger().Debug(ctx, "stopped worker engine")
+			stopApiSrvSignCh <- struct{}{}
+			logger.MustGetSysLogger().Debug(ctx, "stopped server")
+			os.Exit(0)
+		}
 	}()
 	signal.Notify(sysSignCh, syscall.SIGINT, syscall.SIGTERM)
 
