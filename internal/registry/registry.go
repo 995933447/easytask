@@ -11,6 +11,8 @@ import (
 	"github.com/995933447/optionstream"
 	"github.com/995933447/simpletrace"
 	simpletracectx "github.com/995933447/simpletrace/context"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -26,6 +28,9 @@ type Registry struct {
 	readyCheckSrvChan         chan *task.TaskCallbackSrv
 	elect                     autoelect.AutoElection
 	isClusterMode             bool
+	isPaused				  atomic.Bool
+	exitWorkerWait			  sync.WaitGroup
+	exitSchedSignCh			  chan struct{}
 }
 
 func NewRegistry(
@@ -46,7 +51,14 @@ func NewRegistry(
 		readyCheckSrvChan: make(chan *task.TaskCallbackSrv),
 		elect: elect,
 		isClusterMode: isClusterMode,
+		exitSchedSignCh: make(chan struct{}),
 	}
+}
+
+func (r *Registry) Stop() {
+	r.isPaused.Store(true)
+	r.exitSchedSignCh <- struct{}{}
+	r.exitWorkerWait.Wait()
 }
 
 func (r *Registry) Discover(ctx context.Context, srvName string) (*task.TaskCallbackSrv, error) {
@@ -124,7 +136,7 @@ func (r *Registry) HealthCheck(ctx context.Context) error {
 
 func (r *Registry) Run(ctx context.Context) {
 	go r.createHealthCheckWorkerPool(contxt.ChildOf(ctx))
-	go r.sched(contxt.ChildOf(ctx))
+	r.sched(contxt.ChildOf(ctx))
 }
 
 func (r *Registry) sched(ctx context.Context) {
@@ -137,6 +149,18 @@ func (r *Registry) sched(ctx context.Context) {
 	}
 
 	for {
+		var isExitingSched bool
+		select {
+		case _ = <- r.exitSchedSignCh:
+			isExitingSched = true
+		default:
+			break
+		}
+
+		if isExitingSched {
+			break
+		}
+
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 
 		logger.MustGetRegistryLogger().Debug(ctx, "checking health")
@@ -157,6 +181,7 @@ func (r *Registry) createHealthCheckWorkerPool(ctx context.Context) {
 	var i uint
 	for ; i < r.checkHealthWorkerPoolSize; i++ {
 		go r.runWorker(contxt.ChildOf(ctx))
+		r.exitWorkerWait.Add(1)
 		logger.MustGetRegistryLogger().Infof(ctx, "worker(id:%d) is running", i)
 	}
 
@@ -171,8 +196,26 @@ func (r *Registry) runWorker(ctx context.Context) {
 	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
 		origCtxTraceId = traceCtx.GetTraceId()
 	}
+	checkPausedTk := time.NewTicker(time.Second)
+	defer checkPausedTk.Stop()
 	for {
-		srv := <- r.readyCheckSrvChan
+		var (
+			srv *task.TaskCallbackSrv
+			isPaused bool
+		)
+		select {
+			case srv = <- r.readyCheckSrvChan:
+			case <- checkPausedTk.C:
+				if isPaused = r.isPaused.Load(); isPaused {
+					r.exitWorkerWait.Done()
+					break
+				}
+				continue
+		}
+
+		if isPaused {
+			break
+		}
 
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 

@@ -1,6 +1,8 @@
 package mysql
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/995933447/easytask/internal/task"
@@ -187,6 +189,51 @@ func (m *TaskCallbackSrvRouteModel) toEntity() *task.TaskCallbackSrvRoute {
 		)
 }
 
+type TaskLogCallbackReqSnapshot struct {
+	SrvSchema string `gorm:"index:route_addr,unique" json:"srv_schema"`
+	Host string `gorm:"index:route_addr,unique" json:"host"`
+	Port int `gorm:"index:route_addr,unique" json:"port"`
+	TimeoutSec int `json:"timeout_sec"`
+	CallbackAt int64 `json:"callback_at"`
+	CallbackPath string `json:"callback_path"`
+}
+
+func (s TaskLogCallbackReqSnapshot) Value() (driver.Value, error) {
+	j, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	return string(j), nil
+}
+
+func (s *TaskLogCallbackReqSnapshot) Scan(src interface{}) error {
+	err := json.Unmarshal([]byte(src.(string)), s)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type TaskLogCallbackRespSnapshot struct {
+	RespRaw string `json:"resp_raw"`
+}
+
+func (s TaskLogCallbackRespSnapshot) Value() (driver.Value, error) {
+	j, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	return string(j), nil
+}
+
+func (s *TaskLogCallbackRespSnapshot) Scan(src interface{}) error {
+	err := json.Unmarshal([]byte(src.(string)), s)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type TaskLogModel struct {
 	BaseModel
 	TaskId uint64 `json:"task_id"`
@@ -196,6 +243,10 @@ type TaskLogModel struct {
 	IsRunInAsync bool `json:"is_run_in_async"`
 	RespExtra string `json:"resp_extra"`
 	RunTimes int `json:"try_times"`
+	SrvId uint64 `json:"srv_id"`
+	ReqSnapshot *TaskLogCallbackReqSnapshot `json:"req_snapshot"`
+	RespSnapshot *TaskLogCallbackRespSnapshot `json:"resp_snapshot"`
+	CallbackErr string
 }
 
 func (*TaskLogModel) TableName() string {

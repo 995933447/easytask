@@ -17,6 +17,7 @@ type Sched struct {
 	taskRespCh    chan *TaskResp
 	elect         autoelect.AutoElection
 	isClusterMode bool
+	exitSignCh    chan struct{}
 }
 
 func (s *Sched) lockTaskForRun(ctx context.Context, task *Task) (bool, error) {
@@ -33,8 +34,11 @@ func (s *Sched) nextTask() *Task {
 }
 
 func (s *Sched) run(ctx context.Context) {
-	//go s.watchToConfirmTaskRes(ctx)
 	s.schedule(ctx)
+}
+
+func (s *Sched) stop() {
+	s.exitSignCh <- struct{}{}
 }
 
 func (s *Sched) schedule(ctx context.Context) {
@@ -51,6 +55,17 @@ func (s *Sched) schedule(ctx context.Context) {
 		size = 1000
 	)
 	for {
+		var isExitingSched bool
+		select {
+		case _ = <- s.exitSignCh:
+			isExitingSched = true
+		default:
+		}
+
+		if isExitingSched {
+			break
+		}
+
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 		if s.isClusterMode && !s.elect.IsMaster() {
 			err := errs.ErrCurrentNodeNoMaster
@@ -82,41 +97,6 @@ func (s *Sched) schedule(ctx context.Context) {
 	}
 }
 
-//func (s *Sched) watchToConfirmTaskRes(ctx context.Context) {
-//	var (
-//		traceModule = "task_confirm"
-//		origCtxTraceId string
-//	)
-//	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
-//		origCtxTraceId = traceCtx.GetTraceId()
-//	}
-//
-//	for {
-//		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
-//
-//		var taskResps []*TaskResp
-//		taskResp := <-s.taskRespCh
-//		taskResps = append(taskResps, taskResp)
-//		var noMoreTaskResp bool
-//		for {
-//			select {
-//			case taskResp := <- s.taskRespCh:
-//				taskResps = append(taskResps, taskResp)
-//			default:
-//				noMoreTaskResp = true
-//			}
-//
-//			if noMoreTaskResp {
-//				break
-//			}
-//		}
-//
-//		err := s.taskRepo.ConfirmTasks(contxt.ChildOf(ctx), taskResps)
-//		if err != nil {
-//			logger.MustGetSysLogger().Error(ctx, err)
-//		}
-//	}
-//}
 
 func (s *Sched) submitTaskResp(ctx context.Context, resp *TaskResp) error {
 	if err := s.taskRepo.ConfirmTask(ctx, resp); err != nil {
@@ -133,5 +113,6 @@ func NewSched(isClusterMode bool, taskRepo TaskRepo, elect autoelect.AutoElectio
 		taskRespCh: make(chan *TaskResp),
 		elect: elect,
 		isClusterMode: isClusterMode,
+		exitSignCh: make(chan struct{}),
 	}
 }

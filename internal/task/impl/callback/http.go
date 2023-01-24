@@ -17,10 +17,14 @@ import (
 	"time"
 )
 
-type HttpExec struct {}
+type HttpExec struct {
+	taskLogger *task.TaskLogger
+}
 
-func NewHttpExec() *HttpExec {
-	return &HttpExec{}
+func NewHttpExec(taskLogger *task.TaskLogger) *HttpExec {
+	return &HttpExec{
+		taskLogger: taskLogger,
+	}
 }
 
 var _ task.TaskCallbackSrvExec = (*HttpExec)(nil)
@@ -53,16 +57,51 @@ func (e *HttpExec) CallbackSrv(ctx context.Context, oneTask *task.Task, _ any) (
 	} else {
 		timeoutSec = route.GetCallbackTimeoutSec()
 	}
-	err = e.doReq(ctx, &doReqInput{
+
+	var (
+		callbackErr error
+		callbackRespRaw []byte
+	)
+	defer func() {
+		newLogDetailReq := &task.NewTaskCallbackLogDetailReq{
+			TaskId: oneTask.GetId(),
+			RunTimes: oneTask.GetRunTimes(),
+			Route: route,
+			IsRunInAsync: httpResp.IsRunInAsync,
+			Err: err,
+			CallbackPath: oneTask.GetCallbackPath(),
+		}
+		if callbackRespRaw != nil {
+			newLogDetailReq.RespRaw = string(callbackRespRaw)
+		}
+		if httpResp.IsSuccess {
+			newLogDetailReq.TaskStatus = task.StatusSuccess
+		} else if httpResp.IsRunInAsync {
+			newLogDetailReq.TaskStatus = task.StatusRunning
+		} else {
+			newLogDetailReq.TaskStatus = task.StatusFailed
+		}
+		taskLogDetail, err := task.NewTaskCallbackLogDetail(newLogDetailReq)
+		if err != nil {
+			logger.MustGetCallbackLogger().Error(ctx, err)
+			return
+		}
+		err = e.taskLogger.Log(ctx, task.MustNewTaskLog(task.TaskLogTypeCallback, taskLogDetail))
+		if err != nil {
+			logger.MustGetCallbackLogger().Error(ctx, err)
+			return
+		}
+	}()
+	callbackRespRaw, callbackErr = e.doReq(ctx, &doReqInput{
 		Path: oneTask.GetCallbackPath(),
 		Route: route,
 		TimeoutSec: timeoutSec,
 		ReqBytes: httpReqBytes,
 		Resp: httpResp,
 	})
-	if err != nil {
-		logger.MustGetCallbackLogger().Error(ctx, err)
-		return nil, err
+	if callbackErr != nil {
+		logger.MustGetCallbackLogger().Error(ctx, callbackErr)
+		return nil, callbackErr
 	}
 
 	return task.NewCallbackSrvResp(httpResp.IsRunInAsync, httpResp.IsSuccess, httpResp.Extra), nil
@@ -92,7 +131,7 @@ func (e *HttpExec) HeartBeat(ctx context.Context, srv *task.TaskCallbackSrv) (*t
 		go func(route *task.TaskCallbackSrvRoute) {
 			defer wg.Done()
 
-			err = e.doReq(ctx, &doReqInput{
+			_, err = e.doReq(ctx, &doReqInput{
 				Route: route,
 				TimeoutSec: route.GetCallbackTimeoutSec(),
 				ReqBytes: httpReqBytes,
@@ -137,10 +176,10 @@ func (i *doReqInput) Check() error {
 	return nil
 }
 
-func (e *HttpExec) doReq(ctx context.Context, input *doReqInput) error {
-	if err := input.Check(); err != nil {
+func (e *HttpExec) doReq(ctx context.Context, input *doReqInput) (respRaw []byte, err error) {
+	if err = input.Check(); err != nil {
 		logger.MustGetCallbackLogger().Error(ctx, err)
-		return err
+		return
 	}
 
 	reqUrl := fmt.Sprintf("%s://%s:%d%s", input.Route.GetSchema(), input.Route.GetHost(), input.Route.GetPort(), input.Path)
@@ -151,7 +190,7 @@ func (e *HttpExec) doReq(ctx context.Context, input *doReqInput) error {
 	)
 	if err != nil {
 		logger.MustGetCallbackLogger().Error(ctx, err)
-		return err
+		return
 	}
 
 	httpCli := http.Client{}
@@ -171,22 +210,22 @@ func (e *HttpExec) doReq(ctx context.Context, input *doReqInput) error {
 	httpResp, err := httpCli.Do(httpReq)
 	if err != nil {
 		logger.MustGetCallbackLogger().Error(ctx, err)
-		return err
+		return
 	}
 
-	httpRespBody, err := io.ReadAll(httpResp.Body)
+	respRaw, err = io.ReadAll(httpResp.Body)
 	if err != nil {
 		logger.MustGetCallbackLogger().Error(ctx, err)
-		return err
+		return
 	}
 
-	logger.MustGetCallbackLogger().Infof(ctx, "resp:%s", string(httpRespBody))
+	logger.MustGetCallbackLogger().Infof(ctx, "resp:%s", string(respRaw))
 
-	err = json.Unmarshal(httpRespBody, &input.Resp)
+	err = json.Unmarshal(respRaw, &input.Resp)
 	if err != nil {
 		logger.MustGetCallbackLogger().Error(ctx, err)
-		return err
+		return
 	}
 
-	return nil
+	return
 }

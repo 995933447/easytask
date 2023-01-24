@@ -8,7 +8,6 @@ import (
 type TaskRepo interface {
 	TimeoutTasks(ctx context.Context, size int, cursor string) (tasks []*Task, nextCursor string, err error)
 	LockTask(context.Context, *Task) (bool, error)
-	ConfirmTasks(context.Context, []*TaskResp) error
 	ConfirmTask(context.Context, *TaskResp) error
 	AddTask(context.Context, *Task) (string, error)
 	GetTaskById(context.Context, string) (*Task, error)
@@ -21,4 +20,10 @@ type TaskCallbackSrvRepo interface {
 	SetSrvRoutesPassHealthCheck(context.Context, *TaskCallbackSrv) error
 	GetSrvsByIds(context.Context, []string) ([]*TaskCallbackSrv, error)
 	GetSrvs(context.Context, *optionstream.QueryStream) ([]*TaskCallbackSrv, error)
+}
+
+type TaskLogRepo interface {
+	SaveTaskStartedLog(context.Context, *TaskStartedLogDetail) error
+	SaveTaskCallbackLog(context.Context, *TaskCallbackLogDetail) error
+	SaveTaskConfirmedLog(context.Context, *TaskConfirmedLogDetail) error
 }

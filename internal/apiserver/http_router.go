@@ -36,6 +36,8 @@ type HttpRouter struct {
 	routeMap map[string]map[string]*handlerReflect
 	routeMu sync.RWMutex
 	isBooted atomic.Bool
+	isPaused atomic.Bool
+	servingWait sync.WaitGroup
 }
 
 func (r *HttpRouter) RegisterBatch(ctx context.Context, routes []*HttpRoute) error {
@@ -112,6 +114,11 @@ func (r *HttpRouter) Register(ctx context.Context, route *HttpRoute) error {
 	return nil
 }
 
+func (r *HttpRouter) Stop() {
+	r.isPaused.Store(true)
+	r.servingWait.Wait()
+}
+
 func (r *HttpRouter) Boot(ctx context.Context) error {
 	if r.isBooted.Load() {
 		return internalerr.ErrServerStarted
@@ -152,6 +159,9 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 	for path, methodToHandlerMap := range r.routeMap {
 		func(path string, methodToHandlerMap map[string]*handlerReflect) {
 			srvMux.HandleFunc(path, func(writer http.ResponseWriter, req *http.Request) {
+				r.servingWait.Add(1)
+				defer r.servingWait.Done()
+
 				var (
 					ctx context.Context
 					origTraceId = req.Header.Get(httpproto.HeaderSimpleTraceId)
@@ -188,6 +198,11 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 					"receive http request. method:%s, path:%s",
 					req.Method, req.RequestURI,
 					)
+
+				if r.isPaused.Load() {
+					respErr(ctx, writer, errs.ErrCodeServerStopped, "", traceId, respHeader)
+					return
+				}
 
 				handlerReflec, ok := methodToHandlerMap[req.Method]
 				if !ok {

@@ -300,16 +300,16 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 }
 
 func NewTaskSrvRepo(ctx context.Context, connDsn string) (*TaskSrvRepo, error) {
-	srvRepo := &TaskSrvRepo{
+	repo := &TaskSrvRepo{
 		repoConnector: repoConnector{
 			connDsn: connDsn,
 		},
 	}
 	if !migratedTaskSrvRepoDB.Load() {
-		if err := srvRepo.mustGetConn(ctx).AutoMigrate(&TaskCallbackSrvModel{}, &TaskCallbackSrvRouteModel{}); err != nil {
+		if err := repo.mustGetConn(ctx).AutoMigrate(&TaskCallbackSrvModel{}, &TaskCallbackSrvRouteModel{}); err != nil {
 			logger.MustGetRepoLogger().Error(ctx, err)
 			return nil, err
 		}
 	}
-	return srvRepo, nil
+	return repo, nil
 }

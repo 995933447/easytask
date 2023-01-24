@@ -6,6 +6,8 @@ import (
 	"github.com/995933447/easytask/pkg/contxt"
 	"github.com/995933447/simpletrace"
 	simpletracectx "github.com/995933447/simpletrace/context"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -13,40 +15,49 @@ const (
 	DefaultWorkerPoolSize = 100
 )
 
-type workerEngine struct {
+type WorkerEngine struct {
 	workerPoolSize      uint
 	sched               *Sched
 	callbackTaskSrvExec TaskCallbackSrvExec
+	isPaused            atomic.Bool
+	exitWorkerWait      sync.WaitGroup
 }
 
-func NewWorkerEngine(workerPoolSize uint, sched *Sched, callbackTaskSrvExec TaskCallbackSrvExec) *workerEngine {
+func NewWorkerEngine(workerPoolSize uint, sched *Sched, callbackTaskSrvExec TaskCallbackSrvExec) *WorkerEngine {
 	if workerPoolSize <= 0 {
 		workerPoolSize = DefaultWorkerPoolSize
 	}
 
-	return &workerEngine{
+	return &WorkerEngine{
 		workerPoolSize: workerPoolSize,
 		sched: sched,
 		callbackTaskSrvExec: callbackTaskSrvExec,
 	}
 }
 
-func (e *workerEngine) Run(ctx context.Context) {
+func (e *WorkerEngine) Run(ctx context.Context) {
 	e.createWorkerPool(ctx)
 	e.sched.run(ctx)
 }
 
-func (e *workerEngine) createWorkerPool(ctx context.Context) {
+func (e *WorkerEngine) Stop() {
+	e.isPaused.Store(true)
+	e.sched.stop()
+	e.exitWorkerWait.Wait()
+}
+
+func (e *WorkerEngine) createWorkerPool(ctx context.Context) {
 	logger.MustGetSysLogger().Info(ctx, "start create worker pool")
 	var i uint
 	for ; i < e.workerPoolSize; i++ {
 		go e.runWorker(ctx, i)
+		e.exitWorkerWait.Add(1)
 		logger.MustGetSysLogger().Infof(ctx, "task worker(id:%d) running", i)
 	}
 	logger.MustGetSysLogger().Info(ctx, "finish creating worker pool")
 }
 
-func (e *workerEngine) runWorker(ctx context.Context, workerId uint) {
+func (e *WorkerEngine) runWorker(ctx context.Context, workerId uint) {
 	var (
 		traceModule = "task_worker"
 		origCtxTraceId string
@@ -54,12 +65,30 @@ func (e *workerEngine) runWorker(ctx context.Context, workerId uint) {
 	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
 		origCtxTraceId = traceCtx.GetTraceId()
 	}
+
+	checkPausedTk := time.NewTicker(time.Second)
 	for {
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 
 		logger.MustGetSysLogger().Infof(ctx, "worker(id:%d) is ready", workerId)
 
-		task := e.sched.nextTask()
+		var (
+			task *Task
+			isPaused bool
+		)
+		select {
+		case task = <- e.sched.taskCh:
+		case <- checkPausedTk.C:
+			if isPaused = e.isPaused.Load(); isPaused {
+				e.exitWorkerWait.Done()
+				break
+			}
+			continue
+		}
+
+		if isPaused {
+			break
+		}
 
 		if len(task.callbackSrv.GetRoutes()) == 0 {
 			logger.MustGetSysLogger().Warnf(

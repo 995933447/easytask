@@ -2,14 +2,10 @@
 package mysql
 
 const (
-	DbFieldbaseLogger = "base_logger"
-	DbFieldslowThreshold = "slow_threshold"
 	DbFieldconnDsn = "conn_dsn"
 	DbFieldconn = "conn"
 	DbFieldconnMu = "conn_mu"
-	DbFielddb = "db"
 	DbFieldsrvRepo = "srv_repo"
-	DbFielddefaultTaskMaxRunTimeSec = "default_task_max_run_time_sec"
 	DbFieldId = "id"
 	DbFieldCreatedAt = "created_at"
 	DbFieldUpdatedAt = "updated_at"
@@ -38,9 +34,18 @@ const (
 	DbFieldSrvId = "srv_id"
 	DbFieldCallbackTimeoutSec = "callback_timeout_sec"
 	DbFieldEnableHealthCheck = "enable_health_check"
+	DbFieldTimeoutSec = "timeout_sec"
+	DbFieldCallbackAt = "callback_at"
+	DbFieldRespRaw = "resp_raw"
 	DbFieldTaskId = "task_id"
 	DbFieldStartedAt = "started_at"
 	DbFieldEndedAt = "ended_at"
 	DbFieldTaskStatus = "task_status"
 	DbFieldRespExtra = "resp_extra"
+	DbFieldReqSnapshot = "req_snapshot"
+	DbFieldRespSnapshot = "resp_snapshot"
+	DbFieldCallbackErr = "callback_err"
+	DbFieldbaseLogger = "base_logger"
+	DbFieldslowThreshold = "slow_threshold"
+	DbFielddb = "db"
 )

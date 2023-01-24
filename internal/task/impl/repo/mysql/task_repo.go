@@ -17,8 +17,8 @@ var migratedTaskRepoDB atomic.Bool
 
 type TaskRepo struct {
 	srvRepo task.TaskCallbackSrvRepo
+	logRepo task.TaskLogRepo
 	repoConnector
-	defaultTaskMaxRunTimeSec int64
 }
 
 func (r *TaskRepo) DelTaskById(ctx context.Context, id string) error {
@@ -155,10 +155,10 @@ func (r *TaskRepo) AddTask(ctx context.Context, oneTask *task.Task) (string, err
 				DbFieldSchedMode: taskModel.SchedMode,
 				DbFieldTimeCronExpr: taskModel.TimeCronExpr,
 				DbFieldTimeIntervalSec: taskModel.TimeIntervalSec,
-				DbFieldPlanSchedNextAt: taskModel.PlanSchedNextAt,
+				DbFieldPlanSchedNextAt: schedNextAt,
 				DbFieldCallbackSrvId: taskModel.CallbackSrvId,
 				DbFieldCallbackPath: taskModel.CallbackPath,
-				DbFieldAllowMaxRunTimes: taskModel.AllowMaxRunTimes,
+				DbFieldAllowMaxRunTimes: gorm.Expr(DbFieldAllowMaxRunTimes + " + 1"),
 				DbFieldMaxRunTimeSec: taskModel.MaxRunTimeSec,
 				DbFieldDeletedAt: 0,
 			}).Error
@@ -312,12 +312,7 @@ func (r *TaskRepo) LockTask(ctx context.Context, oneTask *task.Task) (bool, erro
 
 	oneTask.IncrRunTimes()
 
-	err = conn.Model(&TaskLogModel{}).Create(&TaskLogModel{
-		TaskId:     taskModelId,
-		StartedAt:  now,
-		TaskStatus: statusRunning,
-		RunTimes:   oneTask.GetRunTimes(),
-	}).Error
+	err = r.logRepo.SaveTaskStartedLog(ctx, task.NewTaskStartedLogDetail(oneTask))
 	if err != nil {
 		logger.MustGetRepoLogger().Error(ctx, err)
 		return false, err
@@ -330,7 +325,6 @@ func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 	now := time.Now().Unix()
 	conn := r.mustGetConn(ctx)
 	taskModelId, err := toTaskModelId(resp.GetTaskId())
-	taskStatus := statusRunning
 
 	if task.IsTaskSuccess(resp.GetTaskStatus()) {
 		err = conn.Model(&TaskModel{}).
@@ -342,7 +336,6 @@ func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 			logger.MustGetRepoLogger().Error(ctx, err)
 			return err
 		}
-		taskStatus = statusSuccess
 	}
 
 	if task.IsTaskFailed(resp.GetTaskStatus()) {
@@ -355,19 +348,9 @@ func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 			logger.MustGetRepoLogger().Error(ctx, err)
 			return err
 		}
-		taskStatus = statusFailed
 	}
 
-	err = conn.Model(&TaskLogModel{}).
-		Where(DbFieldTaskId + " = ?", taskModelId).
-		Where(DbFieldRunTimes + " = ?", resp.GetTaskRunTimes()).
-		Where(DbFieldTaskStatus + " = ?", statusRunning).
-		Updates(map[string]interface{}{
-			DbFieldIsRunInAsync: resp.IsRunInAsync(),
-			DbFieldTaskStatus:   taskStatus,
-			DbFieldEndedAt: time.Now().Unix(),
-			DbFieldRespExtra: resp.GetExtra(),
-		}).Error
+	err = r.logRepo.SaveTaskConfirmedLog(ctx, task.NewTaskConfirmedLogDetail(resp))
 	if err != nil {
 		logger.MustGetRepoLogger().Error(ctx, err)
 		return err
@@ -376,169 +359,23 @@ func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 	return nil
 }
 
-func (r *TaskRepo) ConfirmTasks(ctx context.Context, resps []*task.TaskResp) error {
-	var (
-		successTaskModelIds, failedTaskModelIds []uint64
-		runTimesToRunningAsyncTaskModelIdsMap = make(map[int][]uint64)
-		runTimesToSuccAsyncTaskModelIdsMap, runTimesToSuccSyncTaskModelIdsMap = make(map[int][]uint64), make(map[int][]uint64)
-		runTimesToFailAsyncTaskModelIdsMap, runTimesToFailSyncTaskModelIdsMap =  make(map[int][]uint64), make(map[int][]uint64)
-	)
-	for _, resp := range resps {
-		taskModelId, err := toTaskModelId(resp.GetTaskId())
-		if err != nil {
-			logger.MustGetRepoLogger().Error(ctx, err)
-			return err
-		}
-
-		taskRunTimes := resp.GetTaskRunTimes()
-
-		if task.IsTaskSuccess(resp.GetTaskStatus()) {
-			successTaskModelIds = append(successTaskModelIds, taskModelId)
-			if resp.IsRunInAsync() {
-				runTimesToSuccAsyncTaskModelIdsMap[taskRunTimes] = append(runTimesToSuccAsyncTaskModelIdsMap[taskRunTimes], taskModelId)
-				continue
-			}
-			runTimesToSuccSyncTaskModelIdsMap[taskRunTimes] = append(runTimesToSuccSyncTaskModelIdsMap[taskRunTimes], taskModelId)
-			continue
-		}
-
-		if task.IsTaskFailed(resp.GetTaskStatus()) {
-			failedTaskModelIds = append(failedTaskModelIds, taskModelId)
-			if resp.IsRunInAsync() {
-				runTimesToFailAsyncTaskModelIdsMap[taskRunTimes] = append(runTimesToFailAsyncTaskModelIdsMap[taskRunTimes], taskModelId)
-				continue
-			}
-			runTimesToFailSyncTaskModelIdsMap[taskRunTimes] = append(runTimesToFailSyncTaskModelIdsMap[taskRunTimes], taskModelId)
-			continue
-		}
-
-		if task.IsTaskRunning(resp.GetTaskStatus()) {
-			if !resp.IsRunInAsync() {
-				continue
-			}
-			runTimesToRunningAsyncTaskModelIdsMap[taskRunTimes] = append(runTimesToRunningAsyncTaskModelIdsMap[taskRunTimes], taskModelId)
-			continue
-		}
-	}
-
-	now := time.Now().Unix()
-	conn := r.mustGetConn(ctx)
-	if len(successTaskModelIds) > 0 {
-		err := conn.Model(&TaskModel{}).
-			Where(DbFieldId + " IN ?", successTaskModelIds).
-			Updates(map[string]interface{}{
-				DbFieldLastSuccessAt: now,
-			}).Error
-		if err != nil {
-			logger.MustGetRepoLogger().Error(ctx, err)
-			return err
-		}
-	}
-
-	if len(failedTaskModelIds) > 0 {
-		err := conn.Model(&TaskModel{}).
-			Where(DbFieldId + " IN ?", failedTaskModelIds).
-			Updates(map[string]interface{}{
-				DbFieldLastFailedAt: now,
-			}).Error
-		if err != nil {
-			logger.MustGetRepoLogger().Error(ctx, err)
-			return err
-		}
-	}
-
-	for taskRunTimes, taskModelIds := range runTimesToRunningAsyncTaskModelIdsMap {
-		err := conn.Model(&TaskLogModel{}).
-			Where(DbFieldTaskId + " IN ?", taskModelIds).
-			Where(DbFieldRunTimes, taskRunTimes).
-			Updates(map[string]interface{}{
-				DbFieldIsRunInAsync: true,
-			}).Error
-		if err != nil {
-			logger.MustGetRepoLogger().Error(ctx, err)
-			return err
-		}
-	}
-
-	for taskRunTimes, taskModelIds := range runTimesToSuccAsyncTaskModelIdsMap {
-		err := conn.Model(&TaskLogModel{}).
-			Where(DbFieldTaskId + " IN ?", taskModelIds).
-			Where(DbFieldRunTimes, taskRunTimes).
-			Updates(map[string]interface{}{
-				DbFieldIsRunInAsync: true,
-				DbFieldTaskStatus:   statusSuccess,
-				DbFieldEndedAt: now,
-			}).Error
-		if err != nil {
-			logger.MustGetRepoLogger().Error(ctx, err)
-			return err
-		}
-	}
-
-	for taskRunTimes, taskModelIds := range runTimesToSuccSyncTaskModelIdsMap {
-		err := conn.Model(&TaskLogModel{}).
-			Where(DbFieldTaskId + " IN ?", taskModelIds).
-			Where(DbFieldRunTimes, taskRunTimes).
-			Updates(map[string]interface{}{
-				DbFieldIsRunInAsync: false,
-				DbFieldTaskStatus:   statusSuccess,
-				DbFieldEndedAt: now,
-			}).Error
-		if err != nil {
-			logger.MustGetRepoLogger().Error(ctx, err)
-			return err
-		}
-	}
-
-	for taskRunTimes, taskModelIds := range runTimesToFailAsyncTaskModelIdsMap {
-		err := conn.Model(&TaskLogModel{}).
-			Where(DbFieldTaskId + " IN ?", taskModelIds).
-			Where(DbFieldRunTimes, taskRunTimes).
-			Updates(map[string]interface{}{
-				DbFieldIsRunInAsync: true,
-				DbFieldTaskStatus:   statusFailed,
-				DbFieldEndedAt: now,
-			}).Error
-		if err != nil {
-			logger.MustGetRepoLogger().Error(ctx, err)
-			return err
-		}
-	}
-
-	for taskRunTimes, taskModelIds := range runTimesToFailSyncTaskModelIdsMap {
-		err := conn.Model(&TaskLogModel{}).
-			Where(DbFieldTaskId+ " IN ?", taskModelIds).
-			Where(DbFieldRunTimes, taskRunTimes).
-			Updates(map[string]interface{}{
-				DbFieldIsRunInAsync: false,
-				DbFieldTaskStatus:   statusFailed,
-				DbFieldEndedAt: now,
-			}).Error
-		if err != nil {
-			logger.MustGetRepoLogger().Error(ctx, err)
-			return err
-		}
-	}
-
-	return nil
-}
-
-func NewTaskRepo(ctx context.Context, connDsn string, srvRepo task.TaskCallbackSrvRepo) (*TaskRepo, error) {
-	taskRepo := &TaskRepo{
+func NewTaskRepo(ctx context.Context, connDsn string, srvRepo task.TaskCallbackSrvRepo, logRepo task.TaskLogRepo) (task.TaskRepo, error) {
+	repo := &TaskRepo{
 		srvRepo: srvRepo,
+		logRepo: logRepo,
 		repoConnector: repoConnector{
 			connDsn: connDsn,
 		},
 	}
 
 	if !migratedTaskRepoDB.Load() {
-		if err := taskRepo.mustGetConn(ctx).AutoMigrate(&TaskModel{}, &TaskLogModel{}); err != nil {
+		if err := repo.mustGetConn(ctx).AutoMigrate(&TaskModel{}, &TaskLogModel{}); err != nil {
 			logger.MustGetRepoLogger().Error(ctx, err)
 			return nil, err
 		}
 	}
 
-	return taskRepo, nil
+	return repo, nil
 }
 
 var _ task.TaskRepo = (*TaskRepo)(nil)

@@ -130,7 +130,7 @@ func TestApiServer(t *testing.T) {
 	srvMux.HandleFunc("/add/task/persist", func(writer http.ResponseWriter, request *http.Request) {
 		addTaskResp, err := taskCli.AddTask(contxt.New("add_task", context.Background()), &httpproto.AddTaskReq{
 			Name: "test_task_persist",
-			SrvName: "test_srv",
+			SrvName: "srv_test",
 			CallbackPath: "/add/task/persist/callback",
 			SchedMode: proto.SchedModeTimeCron,
 			TimeCron:  "*/3 * * * *",
@@ -148,7 +148,7 @@ func TestApiServer(t *testing.T) {
 	srvMux.HandleFunc("/add/task/once", func(writer http.ResponseWriter, request *http.Request) {
 		addTaskResp, err := taskCli.AddTask(contxt.New("add_task", context.Background()), &httpproto.AddTaskReq{
 			Name: "test_task_once",
-			SrvName: "test_srv",
+			SrvName: "srv_test",
 			CallbackPath: "/add/task/persist/async_callback",
 			SchedMode: proto.SchedModeTimeSpec,
 			TimeSpecAt: time.Now().Add(time.Minute).Unix(),
@@ -166,7 +166,7 @@ func TestApiServer(t *testing.T) {
 	srvMux.HandleFunc("/add/task/int", func(writer http.ResponseWriter, request *http.Request) {
 		addTaskResp, err := taskCli.AddTask(contxt.New("add_task", context.Background()), &httpproto.AddTaskReq{
 			Name: "test_task_interval",
-			SrvName: "test_srv",
+			SrvName: "srv_test",
 			CallbackPath: "/add/task/persist/callback",
 			SchedMode: proto.SchedModeTimeInterval,
 			TimeIntervalSec: 60 * 5,

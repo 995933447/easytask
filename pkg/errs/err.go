@@ -11,6 +11,7 @@ const (
 	ErrCodeArgsInvalid = 10001
 	ErrCodeTaskNotFound = 10002
 	ErrCodeTaskCallbackSrvNotFound = 10003
+	ErrCodeServerStopped = 10004
 )
 
 var errMap = map[ErrCode]string{
@@ -19,6 +20,7 @@ var errMap = map[ErrCode]string{
 	ErrCodeArgsInvalid: "request arguments are invalid",
 	ErrCodeTaskNotFound: "task not found",
 	ErrCodeTaskCallbackSrvNotFound: "task callback server not found",
+	ErrCodeServerStopped: "task server is stopped",
 }
 
 func GetErrMsg(code ErrCode) string {

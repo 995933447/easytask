@@ -78,7 +78,7 @@ func main() {
 
 	defer runtime.RecoverToTraceAndExit(ctx)
 
-	elect, errDuringElect, err := startElect(ctx, conf)
+	elect, doElectErrCh, err := startElect(ctx, conf)
 	if err != nil {
 		panic(any(err))
 	}
@@ -88,32 +88,38 @@ func main() {
 		case err := <- errDuringWatchConf:
 			logger.MustGetSysLogger().Errorf(ctx, "watching config error:%s", err)
 			panic(any(err))
-		case err := <- errDuringElect:
+		case err := <- doElectErrCh:
 			logger.MustGetSysLogger().Errorf(ctx, "electing occur error:%s", err)
 			panic(any(err))
 		}
 	}()
 
-	taskRepo, taskCallbackSrvRepo, err := NewRepos(ctx, conf)
+	taskRepo, taskCallbackSrvRepo, taskLogRepo, err := NewRepos(ctx, conf)
 	if err != nil {
 		panic(any(err))
 	}
 
-	reg := runRegistry(ctx, conf, taskCallbackSrvRepo, elect)
+	reg := runRegistry(ctx, conf, taskLogRepo, taskCallbackSrvRepo, elect)
 
-	runTaskWorker(ctx, conf, taskRepo, elect)
+	workerEngine := runTaskWorker(ctx, conf, taskLogRepo, taskRepo, elect)
 
-	signCh := make(chan os.Signal)
+	sysSignCh := make(chan os.Signal)
+	stopApiSrvSignCh := make(chan struct{})
 	go func() {
-		for {
-			_ = <-signCh
-			elect.StopElect()
-			os.Exit(0)
-		}
+		_ = <- sysSignCh
+		elect.StopElect()
+		logger.MustGetSysLogger().Debug(ctx, "stopped elect")
+		reg.Stop()
+		logger.MustGetSysLogger().Debug(ctx, "stopped registry")
+		workerEngine.Stop()
+		logger.MustGetSysLogger().Debug(ctx, "stopped worker engine")
+		stopApiSrvSignCh <- struct{}{}
+		logger.MustGetSysLogger().Debug(ctx, "stopped server")
+		os.Exit(0)
 	}()
-	signal.Notify(signCh, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sysSignCh, syscall.SIGINT, syscall.SIGTERM)
 
-	if err = runHttpApiServer(ctx, conf, taskRepo, reg); err != nil {
+	if err = runHttpApiServer(ctx, conf, taskRepo, reg, stopApiSrvSignCh); err != nil {
 		panic(any(err))
 	}
 }
@@ -179,61 +185,71 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, chan e
 		}
 	}
 
-	errDuringLoopCh := make(chan error)
+	doElectErrCh := make(chan error)
 	go func() {
-		if err = elect.LoopInElect(contxt.ChildOf(ctx), errDuringLoopCh); err != nil {
+		if err = elect.LoopInElect(contxt.ChildOf(ctx), doElectErrCh); err != nil {
 			logger.MustGetSysLogger().Error(ctx, err)
-			errDuringLoopCh <- err
+			doElectErrCh <- err
 		}
 	}()
 
-	return elect, errDuringLoopCh, nil
+	return elect, doElectErrCh, nil
 }
 
-func runRegistry(ctx context.Context, conf *Conf, taskCallbackSrvRepo task.TaskCallbackSrvRepo, elect autoelect.AutoElection) *registry.Registry {
+func runRegistry(ctx context.Context, conf *Conf, taskLogRepo task.TaskLogRepo, taskCallbackSrvRepo task.TaskCallbackSrvRepo, elect autoelect.AutoElection) *registry.Registry {
 	reg := registry.NewRegistry(
 		conf.IsClusterMode,
 		conf.HealthCheckWorkerPoolSize,
 		taskCallbackSrvRepo,
-		callback.NewHttpExec(),
+		callback.NewHttpExec(task.NewTaskLogger(taskLogRepo, logger.MustGetCallbackLogger())),
 		elect,
 		)
 	go reg.Run(contxt.ChildOf(ctx))
 	return reg
 }
 
-func NewRepos(ctx context.Context, conf *Conf) (task.TaskRepo, task.TaskCallbackSrvRepo, error) {
+func NewRepos(ctx context.Context, conf *Conf) (task.TaskRepo, task.TaskCallbackSrvRepo, task.TaskLogRepo, error) {
 	var (
 		taskRepo            task.TaskRepo
 		taskCallbackSrvRepo task.TaskCallbackSrvRepo
+		taskLogRepo         task.TaskLogRepo
 		err                 error
 	)
+	if taskLogRepo, err = mysqlrepo.NewTaskLogRepo(ctx, conf.MysqlConf.ConnDsn); err != nil {
+		logger.MustGetSysLogger().Error(ctx, err)
+		return nil, nil, nil, err
+	}
 	if taskCallbackSrvRepo, err = mysqlrepo.NewTaskSrvRepo(ctx, conf.MysqlConf.ConnDsn); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	if taskRepo, err = mysqlrepo.NewTaskRepo(ctx, conf.MysqlConf.ConnDsn, taskCallbackSrvRepo); err != nil {
+	if taskRepo, err = mysqlrepo.NewTaskRepo(ctx, conf.MysqlConf.ConnDsn, taskCallbackSrvRepo, taskLogRepo); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return taskRepo, taskCallbackSrvRepo, nil
+	return taskRepo, taskCallbackSrvRepo, taskLogRepo, nil
 }
 
-func runTaskWorker(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, elect autoelect.AutoElection) {
+func runTaskWorker(ctx context.Context, conf *Conf, taskLogRepo task.TaskLogRepo, taskRepo task.TaskRepo, elect autoelect.AutoElection) *task.WorkerEngine {
 	engine := task.NewWorkerEngine(
 		conf.TaskWorkerPoolSize,
 		task.NewSched(conf.IsClusterMode, taskRepo, elect),
-		callback.NewHttpExec(),
+		callback.NewHttpExec(task.NewTaskLogger(taskLogRepo, logger.MustGetCallbackLogger())),
 		)
 	go engine.Run(contxt.ChildOf(ctx))
+	return engine
 }
 
-func runHttpApiServer(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, reg *registry.Registry) error {
+func runHttpApiServer(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, reg *registry.Registry, stopSignCh chan struct{}) error {
 	router := apiserver.NewHttpRouter(conf.HttpApiSrvConf.Host, conf.HttpApiSrvConf.Port)
 	if err := router.RegisterBatch(ctx, getHttpApiRoutes(taskRepo, reg)); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return err
 	}
+	go func() {
+		<- stopSignCh
+		router.Stop()
+	}()
 	if err := router.Boot(ctx); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return err
