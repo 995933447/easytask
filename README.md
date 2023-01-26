@@ -51,7 +51,6 @@ callback_timeout_sec int 服务回调超时时间(将作为回调任务时候默
 is_enable_health_check bool 是否开启健康检查
 
 RESPONSE PARAM:
-空JSON
 ````
 - 2、注销回调服务
 ````
@@ -66,7 +65,6 @@ host string 服务host
 port int 服务端口
 
 RESPONSE PARAM:
-空JSON
 ````
 - 3、注册任务
 ````
@@ -103,7 +101,6 @@ task_run_times int 确认的是第几次执行的任务
 
 
 RESPONSE PARAM:
-空JSON
 ````
 - 5、停止任务
 ````
@@ -115,7 +112,6 @@ REQUEST PARAM:
 task_id string 任务id
 
 RESPONSE PARAM:
-空JSON
 ````
 
 # TASK HTTP CALLBACK LIST
@@ -150,3 +146,26 @@ is_run_in_async bool 是否异步执行，异步模式需要把执行结果调�
 is_success bool 任务是否执行成功，将记录到mysql任务日志表（task_log）
 extra string 任务执行响应自定义参数，将记录到mysql任务日志表（task_log）
 `````
+
+# example
+#### api调用示例:
+````
+127.0.0.1:8801/add_task
+request:
+{
+   "name":"try",
+    "srv_name":"srv_test", 
+    "callback_path":"/add/task/persist/async_callback",
+    "sched_mode":1,
+    "time_cron":"* * * * * *"
+}
+response:
+{
+    "code": 0,
+    "msg": "",
+    "data": {
+        "task_id": "26"
+    },
+    "hint": "2H7j9fWR1mFKf1Yfu8Cd"
+}
+````
