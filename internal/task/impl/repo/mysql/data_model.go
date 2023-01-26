@@ -36,22 +36,19 @@ type BaseModel struct {
 
 type TaskModel struct {
 	BaseModel
-	Name string `gorm:"index:task_biz,unique"`
-	Arg string
-	LastRunAt int64
-	PlanSchedNextAt int64
-	TimeCronExpr string
-	TimeIntervalSec int
-	SchedMode int
-	CallbackSrvId uint64
-	RunTimes int
-	IsRunInAsync bool
-	LastFailedAt int64
-	LastSuccessAt int64
-	AllowMaxRunTimes int
-	MaxRunTimeSec int
-	CallbackPath string
-	BizId string `gorm:"index:task_biz,unique"`
+	Name string `gorm:"index:task_biz,unique;comment:'任务名称'"`
+	Arg string `gorm:"comment:'参数'"`
+	LastRunAt int64 `gorm:"comment:'上次运行时间'"`
+	PlanSchedNextAt int64 `gorm:"comment:'下次计划执行时间'"`
+	TimeCronExpr string `gorm:"comment:'定时cron表达式'"`
+	TimeIntervalSec int `gorm:"comment:'执行间隔'"`
+	SchedMode int `gorm:"comment:'执行模式.1.指定时间,2.cron表达式,3.间隔执行'"`
+	CallbackSrvId uint64 `gorm:"comment:'回调服务id'"`
+	RunTimes int `gorm:"comment:'已执行次数'"`
+	AllowMaxRunTimes int `gorm:"comment:'最大可执行次数'"`
+	MaxRunTimeSec int `gorm:"comment:'任务最长运行时间'"`
+	CallbackPath string `gorm:"comment:'回调路径'"`
+	BizId string `gorm:"index:task_biz,unique,comment:'用于指定任务唯一业务id'"`
 }
 
 func (*TaskModel) TableName() string {
@@ -121,9 +118,9 @@ func toTaskModelId(entityId string) (uint64, error) {
 
 type TaskCallbackSrvModel struct {
 	BaseModel
-	Name string `gorm:"index:server_name,unique"`
-	CheckedHealthAt int64
-	HasEnableHealthCheck bool
+	Name string `gorm:"index:server_name,unique;comment:'服务名称'"`
+	CheckedHealthAt int64 `gorm:"comment:'上次健康检查时间'"`
+	HasEnableHealthCheck bool `gorm:"comment:'是否有开启健康检查的路由'"`
 }
 
 func (*TaskCallbackSrvModel) TableName() string {
@@ -148,13 +145,13 @@ func toTaskCallbackSrvModelId(entity *task.TaskCallbackSrv) (uint64, error) {
 
 type TaskCallbackSrvRouteModel struct {
 	BaseModel
-	SrvSchema string `gorm:"index:route_addr,unique"`
-	Host string `gorm:"index:route_addr,unique"`
-	Port int `gorm:"index:route_addr,unique"`
-	SrvId uint64 `gorm:"index:route_addr,unique"`
-	CallbackTimeoutSec int
-	CheckedHealthAt int64
-	EnableHealthCheck bool
+	SrvSchema string `gorm:"index:route_addr,unique;comment:'协议'"`
+	Host string `gorm:"index:route_addr,unique;comment:'host'"`
+	Port int `gorm:"index:route_addr,unique;comment:'端口'"`
+	SrvId uint64 `gorm:"index:route_addr,unique;comment:'服务id'"`
+	CallbackTimeoutSec int `gorm:"comment:'回调超时时间'"`
+	CheckedHealthAt int64 `gorm:"comment:'上次健康检查时间'"`
+	EnableHealthCheck bool `gorm:"comment:'是否开启健康检查'"`
 }
 
 func (*TaskCallbackSrvRouteModel) TableName() string {
@@ -236,17 +233,17 @@ func (s *TaskLogCallbackRespSnapshot) Scan(src interface{}) error {
 
 type TaskLogModel struct {
 	BaseModel
-	TaskId uint64 `json:"task_id"`
-	StartedAt int64 `json:"started_at"`
-	EndedAt int64 `json:"ended_at"`
-	TaskStatus int `json:"task_status"`
-	IsRunInAsync bool `json:"is_run_in_async"`
-	RespExtra string `json:"resp_extra"`
-	RunTimes int `json:"try_times"`
-	SrvId uint64 `json:"srv_id"`
-	ReqSnapshot *TaskLogCallbackReqSnapshot `json:"req_snapshot"`
-	RespSnapshot *TaskLogCallbackRespSnapshot `json:"resp_snapshot"`
-	CallbackErr string
+	TaskId uint64 `json:"task_id" gorm:"comment:'任务id'"`
+	StartedAt int64 `json:"started_at" gorm:"comment:'任务开始时间'"`
+	EndedAt int64 `json:"ended_at" gorm:"comment:'任务结束时间'"`
+	TaskStatus int `json:"task_status" gorm:"comment:'任务状态:2.进行中,3.成功,4.失败'"`
+	IsRunInAsync bool `json:"is_run_in_async" gorm:"comment:'是否异步模式'"`
+	RespExtra string `json:"resp_extra" gorm:"comment:'响应额外信息'"`
+	RunTimes int `json:"try_times" gorm:"comment:'任务是第几次执行'"`
+	SrvId uint64 `json:"srv_id" gorm:"comment:'回调服务id'"`
+	ReqSnapshot *TaskLogCallbackReqSnapshot `json:"req_snapshot" gorm:"comment:'请求快照'"`
+	RespSnapshot *TaskLogCallbackRespSnapshot `json:"resp_snapshot" gorm:"comment:'响应快照'"`
+	CallbackErr string `gorm:"comment:'回调错误'"`
 }
 
 func (*TaskLogModel) TableName() string {
