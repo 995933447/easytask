@@ -122,7 +122,7 @@ URL:${task_server_node_schema}//:${task_server_node_host}:{task_server_node_port
 METHOD:POST
 
 REQUEST PARAM:
-cmd int 固定为0
+cmd int 固定为1
 
 RESPONSE PARAM:
 pong bool true,代表服务可用（一般固定回复true即可）。如节点未返回正确响应或者服务异常未正确响应则任务服务节点不可以，会将该节点路由从注册中心剔除。
@@ -134,7 +134,7 @@ URL:${task_server_node_schema}//:${task_server_node_host}:{task_server_node_port
 METHOD:POST
 
 REQUEST PARAM:
-cmd int 固定为1
+cmd int 固定为0
 task_id string 任务id
 task_name string 任务名称
 arg string 任务参数
