@@ -34,4 +34,118 @@ easytask -c easytask/conf/conf.json
 // 调用示例在项目代码根目录test/api_server_test.go:(https://github.com/995933447/easytask/blob/master/test/api_server_test.go)
 ````
 
-# I am lazy,welcome to replenish the document
+# HTTP API列表
+- 1、注册回调服务
+````
+URL:${api_server_host}:${api_server_port}/add_task_server
+
+METHOD:POST
+
+REQUEST PARAM:
+name string 服务名称
+schema string 回调协议(http或者https)
+host string 服务host
+port int 服务端口
+callback_timeout_sec int 服务回调超时时间(将作为回调任务时候默认的http超时时间)
+is_enable_health_check bool 是否开启健康检查
+
+RESPONSE PARAM:
+空JSON
+````
+- 2、注销回调服务
+````
+URL:${api_server_host}:${api_server_port}/del_task_server
+
+METHOD:POST
+
+REQUEST PARAM:
+name string 服务名称
+schema string 回调协议(http或者https)
+host string 服务host
+port int 服务端口
+
+RESPONSE PARAM:
+空JSON
+````
+- 3、注册任务
+````
+URL:${api_server_host}:${api_server_port}/add_task
+
+METHOD:POST
+
+REQUEST PARAM:
+name string 任务名称
+srv_name string 服务名称
+callback_path string 回调路径uri,选传。最终回调url为：${task_server_url}/callback_path
+sched_mode int 调度模式，1.cron表达式模式。2.指定时间模式。3.间隔执行模式。
+time_cron string cron表达式，sched_mode是1时候必传
+time_interval_sec int 间隔执行模式，sched_mode是3时候必传
+time_spec_at int 指定时间执行模式
+arg string 任务执行参数
+biz_id string 任务业务唯一id,如果存在则更新任务配置
+
+
+RESPONSE PARAM:
+task_id string 任务id
+````
+- 4、确认任务结果
+````
+URL:${api_server_host}:${api_server_port}/confirm_task
+
+METHOD:POST
+
+REQUEST PARAM:
+task_id string 任务id
+is_success bool 是否执行成功，将记录到mysql任务日志表（task_log）
+extra string 自定义扩展信息，将记录到mysql任务日志表（task_log）
+task_run_times int 确认的是第几次执行的任务
+
+
+RESPONSE PARAM:
+空JSON
+````
+- 5、停止任务
+````
+URL:${api_server_host}:${api_server_port}/confirm_task
+
+METHOD:POST
+
+REQUEST PARAM:
+task_id string 任务id
+
+RESPONSE PARAM:
+空JSON
+````
+
+### 任务回调HTTP请求
+- 1、心跳检查
+````
+URL:${task_server_node_schema}//:${task_server_node_host}:{task_server_node_port}/
+
+METHOD:POST
+
+REQUEST PARAM:
+cmd int 固定为0
+
+RESPONSE PARAM:
+pong bool true,代表服务可用（一般固定回复true即可）。如节点未返回正确响应或者服务异常未正确响应则任务服务节点不可以，会将该节点路由从注册中心剔除。
+````
+- 2、任务回调
+````
+URL:${task_server_node_schema}//:${task_server_node_host}:{task_server_node_port}/${task_callback_path}
+
+METHOD:POST
+
+REQUEST PARAM:
+cmd int 固定为1
+task_id string 任务id
+task_name string 任务名称
+arg string 任务参数
+run_times int 第几次执行任务
+biz_id string 任务业务唯一id
+
+RESPONSE PARAM:
+is_run_in_async bool 是否异步执行，异步模式需要把执行结果调用异步确认api进行任务结果确认，将记录到mysql任务日志表（task_log）
+is_success bool 任务是否执行成功，将记录到mysql任务日志表（task_log）
+extra string 任务执行响应自定义参数，将记录到mysql任务日志表（task_log）
+`````
