@@ -25,7 +25,7 @@ git clone https://github.com/995933447/easytask.git
 
 // 编译
 go build -o easytask .
-mv easytask /bin/bash
+mv easytask /bin/bash/easytask
 
 // 运行服务, 配置文件示例在项目代码根目录conf/conf.json
 // 项目依赖: mysql+redis或mysql+etcd(二选一即可),reids或etcd配置其一即可,HA主备选举
