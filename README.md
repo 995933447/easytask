@@ -34,7 +34,7 @@ easytask -c easytask/conf/conf.json
 // 调用示例在项目代码根目录test/api_server_test.go:(https://github.com/995933447/easytask/blob/master/test/api_server_test.go)
 ````
 
-# HTTP API列表
+# HTTP API列表 (golang可以使用封装好的客户端：https://github.com/995933447/easytask/tree/master/pkg/rpc)
 - 1、注册回调服务
 ````
 URL:${api_server_host}:${api_server_port}/add_task_server
