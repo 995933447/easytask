@@ -1,9 +1,9 @@
 ## Introduction
-easytask is a distributed task scheduling framework using golang coding. 
+easytask is a high performing and distributed task scheduling framework using golang coding. 
 It's core design goal is to develop quickly and learn simple, lightweight, and easy to expand. 
 Now, it's already open source, and our company use it in production environments, real "out-of-the-box".
 
-easytask是使用go语言开发的一个分布式任务调度平台，其核心设计目标是开发迅速、学习简单、轻量级、易扩展。现已开放源代码并接入公司线上产品线，开箱即用。
+easytask是使用go语言开发的一个高性能的分布式任务调度平台，其核心设计目标是开发迅速、学习简单、轻量级、易扩展。现已开放源代码并接入公司线上产品线，开箱即用。
 
 ## Features
 - 1、简单：操作简单，一分钟上手，代码设计简单，容易二次开发；
@@ -33,3 +33,5 @@ easytask -c easytask/conf/conf.json
 
 // 调用示例在项目代码根目录test/api_server_test.go:(https://github.com/995933447/easytask/blob/master/test/api_server_test.go)
 ````
+
+# I am lazy,welcome to replenish the document
