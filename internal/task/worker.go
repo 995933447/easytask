@@ -81,13 +81,15 @@ func (e *WorkerEngine) runWorker(ctx context.Context, workerId uint) {
 		case <- checkPausedTk.C:
 			if isPaused = e.isPaused.Load(); isPaused {
 				e.exitWorkerWait.Done()
-				break
 			}
-			continue
 		}
 
 		if isPaused {
 			break
+		}
+
+		if task == nil {
+			continue
 		}
 
 		if len(task.callbackSrv.GetRoutes()) == 0 {

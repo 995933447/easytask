@@ -214,6 +214,10 @@ func (r *Registry) runWorker(ctx context.Context) {
 			break
 		}
 
+		if srv == nil {
+			continue
+		}
+
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 
 		logger.MustGetRegistryLogger().Debugf(ctx, "checking srv(name:%s)", srv.GetName())
