@@ -153,11 +153,13 @@ extra string 任务执行响应自定义参数，将记录到mysql任务日志�
 127.0.0.1:8801/add_task
 request:
 {
-   "name":"try",
+    "name":"try",
     "srv_name":"srv_test", 
     "callback_path":"/add/task/persist/async_callback",
     "sched_mode":1,
-    "time_cron":"* * * * * *"
+    "time_cron":"* * * * * *",
+    "arg":"{\"foo\":\"bar\"}",
+    "biz_id":"123"
 }
 response:
 {
