@@ -1,5 +1,5 @@
 ## Introduction
-easytask is a distributed task scheduling framework using goland coding. 
+easytask is a distributed task scheduling framework using golang coding. 
 It's core design goal is to develop quickly and learn simple, lightweight, and easy to expand. 
 Now, it's already open source, and our company use it in production environments, real "out-of-the-box".
 
