@@ -74,7 +74,7 @@ METHOD:POST
 
 REQUEST PARAM:
 name string 任务名称
-srv_name string 服务名称
+srv_name string 回调服务名称，注册任务之前请确保已经注册可用的任务服务
 callback_path string 回调路径uri,选传。最终回调url为：${task_server_url}/callback_path
 sched_mode int 调度模式，1.cron表达式模式。2.指定时间模式。3.间隔执行模式。
 time_cron string cron表达式，sched_mode是1时候必传
