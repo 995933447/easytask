@@ -148,21 +148,26 @@ func (r *TaskRepo) AddTask(ctx context.Context, oneTask *task.Task) (string, err
 	}
 
 	if res.RowsAffected == 0 {
+		updates := map[string]interface{}{
+			DbFieldSchedMode: schedMode,
+			DbFieldTimeCronExpr: oneTask.GetTimeCronExpr(),
+			DbFieldTimeIntervalSec: oneTask.GetTimeIntervalSec(),
+			DbFieldPlanSchedNextAt: schedNextAt,
+			DbFieldCallbackSrvId: srvId,
+			DbFieldCallbackPath: oneTask.GetCallbackPath(),
+			DbFieldAllowMaxRunTimes: allowMaxRunTimes,
+			DbFieldMaxRunTimeSec: taskModel.MaxRunTimeSec,
+			DbFieldDeletedAt: 0,
+			DbFieldArg: oneTask.GetArg(),
+		}
+		if allowMaxRunTimes != math.MaxInt {
+			updates[DbFieldAllowMaxRunTimes] = gorm.Expr(DbFieldRunTimes + " + ?", allowMaxRunTimes)
+		}
 		err = conn.Model(taskModel).
 			Unscoped().
 			Where(DbFieldId + " = ?", taskModel.Id).
-			Updates(map[string]interface{}{
-				DbFieldSchedMode: schedMode,
-				DbFieldTimeCronExpr: oneTask.GetTimeCronExpr(),
-				DbFieldTimeIntervalSec: oneTask.GetTimeIntervalSec(),
-				DbFieldPlanSchedNextAt: schedNextAt,
-				DbFieldCallbackSrvId: srvId,
-				DbFieldCallbackPath: oneTask.GetCallbackPath(),
-				DbFieldAllowMaxRunTimes: gorm.Expr(DbFieldAllowMaxRunTimes + " + 1"),
-				DbFieldMaxRunTimeSec: taskModel.MaxRunTimeSec,
-				DbFieldDeletedAt: 0,
-				DbFieldArg: oneTask.GetArg(),
-			}).Error
+			Updates(updates).
+			Error
 		if err != nil {
 			logger.MustGetRepoLogger().Error(ctx, err)
 			return "", err
