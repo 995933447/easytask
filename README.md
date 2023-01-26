@@ -34,7 +34,8 @@ easytask -c easytask/conf/conf.json
 // 调用示例在项目代码根目录test/api_server_test.go:(https://github.com/995933447/easytask/blob/master/test/api_server_test.go)
 ````
 
-# HTTP API列表 (golang可以使用封装好的客户端：https://github.com/995933447/easytask/tree/master/pkg/rpc)
+# HTTP API LIST
+##### (golang可以使用封装好的客户端：https://github.com/995933447/easytask/blob/master/pkg/rpc/http_cli.go)
 - 1、注册回调服务
 ````
 URL:${api_server_host}:${api_server_port}/add_task_server
@@ -117,8 +118,8 @@ RESPONSE PARAM:
 空JSON
 ````
 
-### 任务回调HTTP请求
-- 1、心跳检查
+# TASK HTTP CALLBACK LIST
+- 1、心跳检查回调
 ````
 URL:${task_server_node_schema}//:${task_server_node_host}:{task_server_node_port}/
 
@@ -130,7 +131,7 @@ cmd int 固定为0
 RESPONSE PARAM:
 pong bool true,代表服务可用（一般固定回复true即可）。如节点未返回正确响应或者服务异常未正确响应则任务服务节点不可以，会将该节点路由从注册中心剔除。
 ````
-- 2、任务回调
+- 2、任务调度回调
 ````
 URL:${task_server_node_schema}//:${task_server_node_host}:{task_server_node_port}/${task_callback_path}
 
