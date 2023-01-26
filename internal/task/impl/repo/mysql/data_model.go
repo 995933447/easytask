@@ -203,11 +203,11 @@ func (s TaskLogCallbackReqSnapshot) Value() (driver.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	return string(j), nil
+	return j, nil
 }
 
 func (s *TaskLogCallbackReqSnapshot) Scan(src interface{}) error {
-	err := json.Unmarshal([]byte(src.(string)), s)
+	err := json.Unmarshal(src.([]byte), s)
 	if err != nil {
 		return err
 	}

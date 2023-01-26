@@ -1,5 +1,4 @@
 {
-  "is_cluster_mode": true,
   "cluster_name": "easy_task",
 
   "task_worker_pool_size": 50,

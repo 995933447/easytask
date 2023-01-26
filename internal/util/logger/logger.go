@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"fmt"
 	"github.com/995933447/log-go"
 	"github.com/995933447/log-go/impl/loggerwriter"
 	"strings"
@@ -33,6 +34,8 @@ type Logger interface {
 	Fatalf(ctx context.Context, format string, args ...interface{})
 
 	Panicf(ctx context.Context, format string, args ...interface{})
+
+	Flush() error
 }
 
 type Conf struct{
@@ -56,6 +59,8 @@ var (
 	callbackLogger Logger
 )
 
+var loggers []Logger
+
 func Init(conf *Conf) {
 	if hasInit.Load() {
 		return
@@ -73,7 +78,23 @@ func Init(conf *Conf) {
 	taskLogger = NewLogger(conf.LogDir + "/task", conf.FileSize, conf.Level)
 	registryLogger = NewLogger(conf.LogDir + "/registry", conf.FileSize, conf.Level)
 	callbackLogger = NewLogger(conf.LogDir + "/callback", conf.FileSize, conf.Level)
+	loggers = []Logger{sysLogger, sessionLogger, electLogger, repoLogger, taskLogger, registryLogger, callbackLogger}
 	hasInit.Store(true)
+}
+
+func Flush() {
+	var wg sync.WaitGroup
+	for idx, logger := range loggers {
+		wg.Add(1)
+		go func(idx int, logger Logger) {
+			err := logger.Flush()
+			if err != nil {
+				fmt.Printf("flush log%d error:" + err.Error() + "\n", idx)
+			}
+			wg.Done()
+		}(idx, logger)
+	}
+	wg.Wait()
 }
 
 func MustGetRegistryLogger() Logger {

@@ -16,7 +16,6 @@ type Sched struct {
 	taskCh        chan *Task
 	taskRespCh    chan *TaskResp
 	elect         autoelect.AutoElection
-	isClusterMode bool
 	exitSignCh    chan struct{}
 }
 
@@ -67,7 +66,7 @@ func (s *Sched) schedule(ctx context.Context) {
 		}
 
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
-		if s.isClusterMode && !s.elect.IsMaster() {
+		if !s.elect.IsMaster() {
 			err := errs.ErrCurrentNodeNoMaster
 			logger.MustGetRegistryLogger().Error(ctx, err)
 			time.Sleep(time.Second)
@@ -106,13 +105,12 @@ func (s *Sched) submitTaskResp(ctx context.Context, resp *TaskResp) error {
 	return nil
 }
 
-func NewSched(isClusterMode bool, taskRepo TaskRepo, elect autoelect.AutoElection) *Sched {
+func NewSched(taskRepo TaskRepo, elect autoelect.AutoElection) *Sched {
 	return &Sched{
 		taskCh: make(chan *Task),
 		taskRepo: taskRepo,
 		taskRespCh: make(chan *TaskResp),
 		elect: elect,
-		isClusterMode: isClusterMode,
 		exitSignCh: make(chan struct{}),
 	}
 }

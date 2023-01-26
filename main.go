@@ -52,7 +52,6 @@ type ApiSrvConf struct {
 }
 
 type Conf struct {
-	IsClusterMode             bool `json:"is_cluster_mode"`
 	ClusterName               string `json:"cluster_name"`
 	TaskWorkerPoolSize        uint `json:"task_worker_pool_size"`
 	ElectDriver               string `json:"elect_driver"`
@@ -105,23 +104,28 @@ func main() {
 
 	sysSignCh := make(chan os.Signal)
 	stopApiSrvSignCh := make(chan struct{})
+	stoppedApiSrvSignCh := make(chan struct{})
+	// 优雅退出
 	go func() {
 		for {
+			logger.MustGetSysLogger().Info(ctx, "gracefully stopping server")
 			_ = <- sysSignCh
 			elect.StopElect()
-			logger.MustGetSysLogger().Debug(ctx, "stopped elect")
+			logger.MustGetSysLogger().Info(ctx, "stopped elect")
 			reg.Stop()
-			logger.MustGetSysLogger().Debug(ctx, "stopped registry")
+			logger.MustGetSysLogger().Info(ctx, "stopped registry")
 			workerEngine.Stop()
-			logger.MustGetSysLogger().Debug(ctx, "stopped worker engine")
+			logger.MustGetSysLogger().Info(ctx, "stopped worker engine")
 			stopApiSrvSignCh <- struct{}{}
-			logger.MustGetSysLogger().Debug(ctx, "stopped server")
+			<- stoppedApiSrvSignCh
+			logger.MustGetSysLogger().Info(ctx, "stopped api server")
+			logger.Flush()
 			os.Exit(0)
 		}
 	}()
 	signal.Notify(sysSignCh, syscall.SIGINT, syscall.SIGTERM)
 
-	if err = runHttpApiServer(ctx, conf, taskRepo, reg, stopApiSrvSignCh); err != nil {
+	if err = runHttpApiServer(ctx, conf, taskRepo, reg, stopApiSrvSignCh, stoppedApiSrvSignCh); err != nil {
 		panic(any(err))
 	}
 }
@@ -200,7 +204,6 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, chan e
 
 func runRegistry(ctx context.Context, conf *Conf, taskLogRepo task.TaskLogRepo, taskCallbackSrvRepo task.TaskCallbackSrvRepo, elect autoelect.AutoElection) *registry.Registry {
 	reg := registry.NewRegistry(
-		conf.IsClusterMode,
 		conf.HealthCheckWorkerPoolSize,
 		taskCallbackSrvRepo,
 		callback.NewHttpExec(task.NewTaskLogger(taskLogRepo, logger.MustGetCallbackLogger())),
@@ -235,14 +238,14 @@ func NewRepos(ctx context.Context, conf *Conf) (task.TaskRepo, task.TaskCallback
 func runTaskWorker(ctx context.Context, conf *Conf, taskLogRepo task.TaskLogRepo, taskRepo task.TaskRepo, elect autoelect.AutoElection) *task.WorkerEngine {
 	engine := task.NewWorkerEngine(
 		conf.TaskWorkerPoolSize,
-		task.NewSched(conf.IsClusterMode, taskRepo, elect),
+		task.NewSched(taskRepo, elect),
 		callback.NewHttpExec(task.NewTaskLogger(taskLogRepo, logger.MustGetCallbackLogger())),
 		)
 	go engine.Run(contxt.ChildOf(ctx))
 	return engine
 }
 
-func runHttpApiServer(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, reg *registry.Registry, stopSignCh chan struct{}) error {
+func runHttpApiServer(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, reg *registry.Registry, stopSignCh, stoppedSignCh chan struct{}) error {
 	router := apiserver.NewHttpRouter(conf.HttpApiSrvConf.Host, conf.HttpApiSrvConf.Port)
 	if err := router.RegisterBatch(ctx, getHttpApiRoutes(taskRepo, reg)); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
@@ -251,6 +254,7 @@ func runHttpApiServer(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, r
 	go func() {
 		<- stopSignCh
 		router.Stop()
+		stoppedSignCh <- struct{}{}
 	}()
 	if err := router.Boot(ctx); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)

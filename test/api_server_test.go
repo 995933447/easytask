@@ -180,6 +180,16 @@ func TestApiServer(t *testing.T) {
 		t.Logf("task id：%s", addTaskResp.TaskId)
 	})
 
+	srvMux.HandleFunc("/stop/task", func(writer http.ResponseWriter, request *http.Request) {
+		_, err := taskCli.StopTask(context.TODO(), &httpproto.StopTaskReq{
+			TaskId: request.URL.Query().Get("id"),
+		})
+		if err != nil {
+			t.Fatal(err)
+			return
+		}
+	})
+
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", "0.0.0.0", 8082),
 		Handler:      srvMux,

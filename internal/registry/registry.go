@@ -27,14 +27,12 @@ type Registry struct {
 	callbackSrvExec           task.TaskCallbackSrvExec
 	readyCheckSrvChan         chan *task.TaskCallbackSrv
 	elect                     autoelect.AutoElection
-	isClusterMode             bool
 	isPaused				  atomic.Bool
 	exitWorkerWait			  sync.WaitGroup
 	exitSchedSignCh			  chan struct{}
 }
 
 func NewRegistry(
-	isClusterMode bool,
 	checkHealthWorkerPoolSize uint,
 	srvRepo task.TaskCallbackSrvRepo,
 	callbackSrvExec task.TaskCallbackSrvExec,
@@ -50,7 +48,6 @@ func NewRegistry(
 		callbackSrvExec: callbackSrvExec,
 		readyCheckSrvChan: make(chan *task.TaskCallbackSrv),
 		elect: elect,
-		isClusterMode: isClusterMode,
 		exitSchedSignCh: make(chan struct{}),
 	}
 }
@@ -98,7 +95,7 @@ func (r *Registry) Unregister(ctx context.Context, srv *task.TaskCallbackSrv) er
 }
 
 func (r *Registry) HealthCheck(ctx context.Context) error {
-	if r.isClusterMode && !r.elect.IsMaster() {
+	if !r.elect.IsMaster() {
 		err := errs.ErrCurrentNodeNoMaster
 		logger.MustGetRegistryLogger().Error(ctx, err)
 		return err
