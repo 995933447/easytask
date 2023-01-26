@@ -31,5 +31,5 @@ mv easytask /bin/bash/easytask
 // 项目依赖: mysql+redis或mysql+etcd(二选一即可),reids或etcd配置其一即可,HA主备选举
 easytask -c easytask/conf/conf.json
 
-// 调用示例在项目代码根目录test/api_server_test.go:https://github.com/995933447/easytask/blob/master/test/api_server_test.go
+// 调用示例在项目代码根目录test/api_server_test.go:(https://github.com/995933447/easytask/blob/master/test/api_server_test.go)
 ````
