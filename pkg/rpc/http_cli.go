@@ -16,7 +16,7 @@ import (
 
 type HttpReqOpt func(req *http.Request, client *http.Client) error
 
-var TimeoutOpt = func(timeout time.Duration) HttpReqOpt {
+func WithTimeoutHttpOpt(timeout time.Duration) HttpReqOpt {
 	return func(_ *http.Request, client *http.Client) error {
 		client.Timeout = timeout
 		return nil
