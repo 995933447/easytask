@@ -18,7 +18,7 @@ func TestApiServer(t *testing.T) {
 	srvMux := http.NewServeMux()
 
 	taskCli := rpc.NewHttpCli("http://127.0.0.1:8801")
-	_, err := taskCli.RegisterTaskCallbackSrv(contxt.New("test", context.TODO()), &httpproto.RegisterTaskCallbackSrvReq{
+	_, err := taskCli.RegisterTaskCallbackSrv(context.TODO(), &httpproto.RegisterTaskCallbackSrvReq{
 		Name: "srv_test",
 		Schema: "http",
 		Host: "127.0.0.1",
@@ -115,7 +115,7 @@ func TestApiServer(t *testing.T) {
 		}
 
 		time.Sleep(time.Minute)
-		_, err = taskCli.ConfirmTask(context.Background(), &httpproto.ConfirmTaskReq{
+		_, err = taskCli.ConfirmTask(context.TODO(), &httpproto.ConfirmTaskReq{
 			TaskId: req.TaskId,
 			IsSuccess: true,
 			TaskRunTimes: req.RunTimes,
@@ -128,7 +128,7 @@ func TestApiServer(t *testing.T) {
 	})
 
 	srvMux.HandleFunc("/add/task/persist", func(writer http.ResponseWriter, request *http.Request) {
-		addTaskResp, err := taskCli.AddTask(contxt.New("add_task", context.Background()), &httpproto.AddTaskReq{
+		addTaskResp, err := taskCli.AddTask(context.TODO(), &httpproto.AddTaskReq{
 			Name: "test_task_persist",
 			SrvName: "srv_test",
 			CallbackPath: "/add/task/persist/callback",
@@ -146,7 +146,7 @@ func TestApiServer(t *testing.T) {
 	})
 
 	srvMux.HandleFunc("/add/task/once", func(writer http.ResponseWriter, request *http.Request) {
-		addTaskResp, err := taskCli.AddTask(contxt.New("add_task", context.Background()), &httpproto.AddTaskReq{
+		addTaskResp, err := taskCli.AddTask(context.TODO(), &httpproto.AddTaskReq{
 			Name: "test_task_once",
 			SrvName: "srv_test",
 			CallbackPath: "/add/task/persist/async_callback",
@@ -164,7 +164,7 @@ func TestApiServer(t *testing.T) {
 	})
 
 	srvMux.HandleFunc("/add/task/int", func(writer http.ResponseWriter, request *http.Request) {
-		addTaskResp, err := taskCli.AddTask(contxt.New("add_task", context.Background()), &httpproto.AddTaskReq{
+		addTaskResp, err := taskCli.AddTask(context.TODO(), &httpproto.AddTaskReq{
 			Name: "test_task_interval",
 			SrvName: "srv_test",
 			CallbackPath: "/add/task/persist/callback",
