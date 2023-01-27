@@ -160,7 +160,7 @@ func (r *TaskRepo) AddTask(ctx context.Context, oneTask *task.Task) (string, err
 			DbFieldDeletedAt: 0,
 			DbFieldArg: oneTask.GetArg(),
 		}
-		if allowMaxRunTimes != math.MaxInt {
+		if schedMode == schedModeTimeSpec && (taskModel.SchedMode != schedModeTimeSpec || taskModel.PlanSchedNextAt != schedNextAt) {
 			updates[DbFieldAllowMaxRunTimes] = gorm.Expr(DbFieldRunTimes + " + ?", allowMaxRunTimes)
 		}
 		err = conn.Model(taskModel).
