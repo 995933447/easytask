@@ -108,7 +108,6 @@ func main() {
 	// 优雅退出
 	go func() {
 		for {
-			logger.MustGetSysLogger().Info(ctx, "gracefully stopping server")
 			_ = <- sysSignCh
 			elect.StopElect()
 			logger.MustGetSysLogger().Info(ctx, "stopped elect")
