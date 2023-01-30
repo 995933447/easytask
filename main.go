@@ -45,6 +45,7 @@ type RedisConf struct {
 type HttpApiSrvConf struct {
 	Host string `json:"host"`
 	Port int `json:"port"`
+	PprofPort int `json:"pprof_port"`
 }
 
 type ApiSrvConf struct {
@@ -245,7 +246,7 @@ func runTaskWorker(ctx context.Context, conf *Conf, taskLogRepo task.TaskLogRepo
 }
 
 func runHttpApiServer(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, reg *registry.Registry, stopSignCh, stoppedSignCh chan struct{}) error {
-	router := apiserver.NewHttpRouter(conf.HttpApiSrvConf.Host, conf.HttpApiSrvConf.Port)
+	router := apiserver.NewHttpRouter(conf.HttpApiSrvConf.Host, conf.HttpApiSrvConf.Port, conf.PprofPort)
 	if err := router.RegisterBatch(ctx, getHttpApiRoutes(taskRepo, reg)); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return err

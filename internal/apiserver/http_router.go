@@ -15,6 +15,7 @@ import (
 	"github.com/ahmek/kit/args"
 	"github.com/go-playground/validator"
 	"net/http"
+	_ "net/http/pprof"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -33,6 +34,7 @@ func (r *HttpRoute) Check() error {
 type HttpRouter struct {
 	host string
 	port int
+	pprofPort int
 	routeMap map[string]map[string]*handlerReflect
 	routeMu sync.RWMutex
 	isBooted atomic.Bool
@@ -132,6 +134,12 @@ func (r *HttpRouter) Boot(ctx context.Context) error {
 	defer func() {
 		if r.isBooted.Load() {
 			r.isBooted.Store(false)
+		}
+	}()
+
+	go func() {
+		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", r.host, r.pprofPort), nil); err != nil {
+			logger.MustGetSessLogger().Error(ctx, err)
 		}
 	}()
 
@@ -318,10 +326,11 @@ func (r *HttpRouter) writeResp(ctx context.Context, writer http.ResponseWriter, 
 	return nil
 }
 
-func NewHttpRouter(host string, port int) *HttpRouter {
+func NewHttpRouter(host string, port, pprofPort int) *HttpRouter {
 	return &HttpRouter{
 		host: host,
 		port: port,
+		pprofPort: pprofPort,
 		routeMap: make(map[string]map[string]*handlerReflect),
 	}
 }

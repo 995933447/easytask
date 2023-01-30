@@ -152,7 +152,7 @@ func NewLogger(baseDir string, maxFileSize int64, level string) Logger {
 		maxFileSize,
 		5,
 		loggerwriter.OpenNewFileByByDateHour,
-		100000,
+		10000,
 		)
 	go func() {
 		err := writer.Loop()
