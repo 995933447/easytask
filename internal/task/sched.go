@@ -65,7 +65,7 @@ func (s *Sched) schedule(ctx context.Context) {
 			break
 		}
 
-		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
+		ctx = contxt.NewWithTrace(traceModule, context.TODO(), traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 		if !s.elect.IsMaster() {
 			err := errs.ErrCurrentNodeNoMaster
 			logger.MustGetRegistryLogger().Error(ctx, err)

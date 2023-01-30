@@ -68,7 +68,7 @@ func (e *WorkerEngine) runWorker(ctx context.Context, workerId uint) {
 
 	checkPausedTk := time.NewTicker(time.Second * 2)
 	for {
-		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
+		ctx = contxt.NewWithTrace(traceModule, context.TODO(), traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 
 		logger.MustGetSysLogger().Infof(ctx, "worker(id:%d) is ready", workerId)
 

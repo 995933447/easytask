@@ -158,7 +158,7 @@ func (r *Registry) sched(ctx context.Context) {
 			break
 		}
 
-		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
+		ctx = contxt.NewWithTrace(traceModule, context.TODO(), traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 
 		logger.MustGetRegistryLogger().Debug(ctx, "checking health")
 
@@ -216,7 +216,7 @@ func (r *Registry) runWorker(ctx context.Context) {
 			continue
 		}
 
-		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
+		ctx = contxt.NewWithTrace(traceModule, context.TODO(), traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 
 		logger.MustGetRegistryLogger().Debugf(ctx, "checking srv(name:%s)", srv.GetName())
 

@@ -182,7 +182,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, chan e
 				conf.ClusterName,
 				time.Second * 5,
 				distribmufactory.MuTypeRedis,
-				distribmufactory.NewRedisMuDriverConf(redis, 500),
+				distribmufactory.NewRedisMuDriverConf(redis, 1000),
 			),
 		)
 		if err != nil {
