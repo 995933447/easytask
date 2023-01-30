@@ -67,7 +67,7 @@ type Conf struct {
 func main() {
 	ctx := contxt.New("main", context.TODO())
 
-	conf, errDuringWatchConf, err := loadConf()
+	conf, err := loadConf()
 	if err != nil {
 		panic(any(err))
 	}
@@ -85,9 +85,6 @@ func main() {
 
 	go func() {
 		select {
-		case err := <- errDuringWatchConf:
-			logger.MustGetSysLogger().Errorf(ctx, "watching config error:%s", err)
-			panic(any(err))
 		case err := <- doElectErrCh:
 			logger.MustGetSysLogger().Errorf(ctx, "electing occur error:%s", err)
 			panic(any(err))
@@ -130,16 +127,14 @@ func main() {
 	}
 }
 
-func loadConf() (*Conf, chan error, error) {
+func loadConf() (*Conf, error) {
 	confFile := scan.OptStr("c")
 	var conf Conf
-	confLoader := confloader.NewLoader(confFile, 3, &conf)
+	confLoader := confloader.NewLoader(confFile, 10, &conf)
 	if err := confLoader.Load(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	errCh := make(chan error)
-	go confLoader.WatchToLoad(errCh)
-	return &conf, errCh, nil
+	return &conf, nil
 }
 
 func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, chan error, error) {
