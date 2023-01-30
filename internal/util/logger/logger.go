@@ -87,11 +87,11 @@ func Flush() {
 	for idx, logger := range loggers {
 		wg.Add(1)
 		go func(idx int, logger Logger) {
+			defer wg.Done()
 			err := logger.Flush()
 			if err != nil {
 				fmt.Printf("flush log%d error:" + err.Error() + "\n", idx)
 			}
-			wg.Done()
 		}(idx, logger)
 	}
 	wg.Wait()

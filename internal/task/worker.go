@@ -66,7 +66,7 @@ func (e *WorkerEngine) runWorker(ctx context.Context, workerId uint) {
 		origCtxTraceId = traceCtx.GetTraceId()
 	}
 
-	checkPausedTk := time.NewTicker(time.Second)
+	checkPausedTk := time.NewTicker(time.Second * 2)
 	for {
 		ctx = contxt.NewWithTrace(traceModule, ctx, traceModule + "_" + origCtxTraceId + "." + simpletrace.NewTraceId(), "")
 
@@ -81,6 +81,7 @@ func (e *WorkerEngine) runWorker(ctx context.Context, workerId uint) {
 		case <- checkPausedTk.C:
 			if isPaused = e.isPaused.Load(); isPaused {
 				e.exitWorkerWait.Done()
+				logger.MustGetSysLogger().Debugf(ctx, "worker(id:%d) exited", workerId)
 			}
 		}
 

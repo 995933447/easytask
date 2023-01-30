@@ -193,7 +193,7 @@ func (r *Registry) runWorker(ctx context.Context) {
 	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
 		origCtxTraceId = traceCtx.GetTraceId()
 	}
-	checkPausedTk := time.NewTicker(time.Second)
+	checkPausedTk := time.NewTicker(time.Second * 2)
 	defer checkPausedTk.Stop()
 	for {
 		var (
@@ -205,9 +205,7 @@ func (r *Registry) runWorker(ctx context.Context) {
 			case <- checkPausedTk.C:
 				if isPaused = r.isPaused.Load(); isPaused {
 					r.exitWorkerWait.Done()
-					break
 				}
-				continue
 		}
 
 		if isPaused {

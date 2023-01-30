@@ -264,6 +264,7 @@ func (r *TaskRepo) TimeoutTasks(ctx context.Context, size int, cursor string) ([
 			TimeSpecAt: timeSpecAt,
 			TimeIntervalSec: taskModel.TimeIntervalSec,
 			TimeCronExpr: taskModel.TimeCronExpr,
+			BizId: taskModel.BizId,
 		})
 		if err != nil {
 			logger.MustGetRepoLogger().Error(ctx, err)
