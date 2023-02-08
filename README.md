@@ -31,7 +31,9 @@ mv easytask /bin/bash/easytask
 // 项目依赖: mysql+redis或mysql+etcd(二选一即可),reids或etcd配置其一即可,用于HA主备选举。任务相关数据存储在mysql中。
 easytask -c easytask/conf/conf.json
 
-// 调用示例在项目代码根目录test/api_server_test.go:(https://github.com/995933447/easytask/blob/master/test/api_server_test.go)
+// CTRL+C 会优雅退出.easytak捕获了SIGINT和SIGTERM信号,收到信号均会优雅退出.
+
+// api调用示例在项目代码根目录test/api_server_test.go:(https://github.com/995933447/easytask/blob/master/test/api_server_test.go)
 ````
 
 # HTTP API LIST
