@@ -19,7 +19,6 @@ const (
 
 const (
 	statusNil = iota
-	statusReady
 	statusRunning
 	statusSuccess
 	statusFailed

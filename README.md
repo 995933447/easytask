@@ -171,3 +171,6 @@ response:
     "hint": "2H7j9fWR1mFKf1Yfu8Cd"
 }
 ````
+
+# assistant tools
+基于php开发的任务面板和管理后台:https://github.com/995933447/easytask-admin
