@@ -33,7 +33,7 @@ easytask -c easytask/conf/conf.json
 
 // CTRL+C 会优雅退出.easytak捕获了SIGINT和SIGTERM信号,收到信号均会优雅退出.
 
-// api调用示例在项目代码根目录test/api_server_test.go:(https://github.com/995933447/easytask/blob/master/test/api_server_test.go)
+// 调用api配置任务示例在项目代码根目录test/api_server_test.go:(https://github.com/995933447/easytask/blob/master/test/api_server_test.go)
 ````
 
 # HTTP API LIST
