@@ -232,13 +232,13 @@ func (s *TaskLogCallbackRespSnapshot) Scan(src interface{}) error {
 
 type TaskLogModel struct {
 	BaseModel
-	TaskId uint64 `json:"task_id" gorm:"comment:'任务id'"`
+	TaskId uint64 `json:"task_id" gorm:"index:task_run_times,unique;comment:'任务id'"`
 	StartedAt int64 `json:"started_at" gorm:"comment:'任务开始时间'"`
 	EndedAt int64 `json:"ended_at" gorm:"comment:'任务结束时间'"`
 	TaskStatus int `json:"task_status" gorm:"comment:'任务状态:2.进行中,3.成功,4.失败'"`
 	IsRunInAsync bool `json:"is_run_in_async" gorm:"comment:'是否异步模式'"`
 	RespExtra string `json:"resp_extra" gorm:"comment:'响应额外信息'"`
-	RunTimes int `json:"try_times" gorm:"comment:'任务是第几次执行'"`
+	RunTimes int `json:"try_times" gorm:"index:task_run_times,unique;comment:'任务是第几次执行'"`
 	SrvId uint64 `json:"srv_id" gorm:"comment:'回调服务id'"`
 	ReqSnapshot *TaskLogCallbackReqSnapshot `json:"req_snapshot" gorm:"comment:'请求快照'"`
 	RespSnapshot *TaskLogCallbackRespSnapshot `json:"resp_snapshot" gorm:"comment:'响应快照'"`
