@@ -10,7 +10,8 @@ import (
 	"github.com/995933447/easytask/internal/registry"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/task/impl/callback"
-	mysqlrepo "github.com/995933447/easytask/internal/task/impl/repo/mysql"
+	"github.com/995933447/easytask/internal/task/impl/repo/mysql"
+	"github.com/995933447/easytask/internal/util/conf"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/easytask/internal/util/runtime"
 	"github.com/995933447/easytask/pkg/contxt"
@@ -24,61 +25,21 @@ import (
 	"time"
 )
 
-type MysqlConf struct {
-	ConnDsn string `json:"dsn"`
-}
-
-type EtcdConf struct {
-	Endpoints []string `json:"endpoints"`
-}
-
-type RedisNodeConf struct {
-	Host string `json:"host"`
-	Port int `json:"port"`
-	Password string `json:"password"`
-}
-
-type RedisConf struct {
-	Nodes []*RedisNodeConf `json:"nodes"`
-}
-
-type HttpApiSrvConf struct {
-	Host string `json:"host"`
-	Port int `json:"port"`
-	PprofPort int `json:"pprof_port"`
-}
-
-type ApiSrvConf struct {
-	*HttpApiSrvConf `json:"http"`
-}
-
-type Conf struct {
-	ClusterName               string `json:"cluster_name"`
-	TaskWorkerPoolSize        uint `json:"task_worker_pool_size"`
-	ElectDriver               string `json:"elect_driver"`
-	*MysqlConf                `json:"mysql"`
-	*EtcdConf                 `json:"etcd"`
-	*RedisConf                `json:"redis"`
-	HealthCheckWorkerPoolSize uint `json:"health_check_worker_pool_size"`
-	LoggerConf                *logger.Conf `json:"log"`
-	*ApiSrvConf               `json:"api_server"`
-}
-
 func main() {
 	ctx := contxt.New("main", context.TODO())
 
-	conf, err := loadConf()
+	cfg, err := loadConf()
 	if err != nil {
 		panic(any(err))
 	}
 
-	logger.Init(conf.LoggerConf)
+	logger.Init(cfg.LoggerConf)
 
 	logger.MustGetSysLogger().Info(ctx, "easytask starting...")
 
 	defer runtime.RecoverToTraceAndExit(ctx)
 
-	elect, doElectErrCh, err := startElect(ctx, conf)
+	elect, doElectErrCh, err := startElect(ctx, cfg)
 	if err != nil {
 		panic(any(err))
 	}
@@ -91,14 +52,14 @@ func main() {
 		}
 	}()
 
-	taskRepo, taskCallbackSrvRepo, taskLogRepo, err := NewRepos(ctx, conf)
+	taskRepo, taskCallbackSrvRepo, taskLogRepo, err := NewRepos(ctx, cfg)
 	if err != nil {
 		panic(any(err))
 	}
 
-	reg := runRegistry(ctx, conf, taskLogRepo, taskCallbackSrvRepo, elect)
+	reg := runRegistry(ctx, cfg, taskLogRepo, taskCallbackSrvRepo, elect)
 
-	workerEngine := runTaskWorker(ctx, conf, taskLogRepo, taskRepo, elect)
+	workerEngine := runTaskWorker(ctx, cfg, taskLogRepo, taskRepo, elect)
 
 	sysSignCh := make(chan os.Signal)
 	stopApiSrvSignCh := make(chan struct{})
@@ -122,30 +83,30 @@ func main() {
 	}()
 	signal.Notify(sysSignCh, syscall.SIGINT, syscall.SIGTERM)
 
-	if err = runHttpApiServer(ctx, conf, taskRepo, reg, stopApiSrvSignCh, stoppedApiSrvSignCh); err != nil {
+	if err = runHttpApiServer(ctx, cfg, taskRepo, reg, stopApiSrvSignCh, stoppedApiSrvSignCh); err != nil {
 		panic(any(err))
 	}
 }
 
-func loadConf() (*Conf, error) {
+func loadConf() (*conf.AppConf, error) {
 	confFile := scan.OptStr("c")
-	var conf Conf
-	confLoader := confloader.NewLoader(confFile, 10, &conf)
+	var cfg conf.AppConf
+	confLoader := confloader.NewLoader(confFile, 10, &cfg)
 	if err := confLoader.Load(); err != nil {
 		return nil, err
 	}
-	return &conf, nil
+	return &cfg, nil
 }
 
-func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, chan error, error) {
+func startElect(ctx context.Context, cfg *conf.AppConf) (autoelect.AutoElection, chan error, error) {
 	var (
 		elect autoelect.AutoElection
 		err error
 	)
-	switch conf.ElectDriver {
+	switch cfg.ElectDriver {
 	case "etcd":
 		etcdCli, err := client.New(client.Config{
-			Endpoints: conf.Endpoints,
+			Endpoints: cfg.Endpoints,
 		})
 		if err != nil {
 			logger.MustGetSysLogger().Error(ctx, err)
@@ -155,7 +116,7 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, chan e
 		elect, err = electfactory.NewAutoElection(
 			electfactory.ElectDriverGitDistribMu,
 			electfactory.NewDistribMuElectDriverConf(
-				conf.ClusterName,
+				cfg.ClusterName,
 				time.Second * 5,
 				distribmufactory.MuTypeEtcd,
 				distribmufactory.NewEtcdMuDriverConf(etcdCli),
@@ -167,14 +128,14 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, chan e
 		}
 	case "redis":
 		var nodes []*redisgroup.Node
-		for _, nodeConf := range conf.RedisConf.Nodes {
+		for _, nodeConf := range cfg.RedisConf.Nodes {
 			nodes = append(nodes, redisgroup.NewNode(nodeConf.Host, nodeConf.Port, nodeConf.Password))
 		}
 		redis := redisgroup.NewGroup(nodes, logger.MustGetElectLogger().(*log.Logger))
 		elect, err = electfactory.NewAutoElection(
 			electfactory.ElectDriverGitDistribMu,
 			electfactory.NewDistribMuElectDriverConf(
-				conf.ClusterName,
+				cfg.ClusterName,
 				time.Second * 5,
 				distribmufactory.MuTypeRedis,
 				distribmufactory.NewRedisMuDriverConf(redis, 1000),
@@ -197,9 +158,9 @@ func startElect(ctx context.Context, conf *Conf) (autoelect.AutoElection, chan e
 	return elect, doElectErrCh, nil
 }
 
-func runRegistry(ctx context.Context, conf *Conf, taskLogRepo task.TaskLogRepo, taskCallbackSrvRepo task.TaskCallbackSrvRepo, elect autoelect.AutoElection) *registry.Registry {
+func runRegistry(ctx context.Context, cfg *conf.AppConf, taskLogRepo task.TaskLogRepo, taskCallbackSrvRepo task.TaskCallbackSrvRepo, elect autoelect.AutoElection) *registry.Registry {
 	reg := registry.NewRegistry(
-		conf.HealthCheckWorkerPoolSize,
+		cfg.HealthCheckWorkerPoolSize,
 		taskCallbackSrvRepo,
 		callback.NewHttpExec(task.NewTaskLogger(taskLogRepo, logger.MustGetCallbackLogger())),
 		elect,
@@ -208,31 +169,31 @@ func runRegistry(ctx context.Context, conf *Conf, taskLogRepo task.TaskLogRepo, 
 	return reg
 }
 
-func NewRepos(ctx context.Context, conf *Conf) (task.TaskRepo, task.TaskCallbackSrvRepo, task.TaskLogRepo, error) {
+func NewRepos(ctx context.Context, cfg *conf.AppConf) (task.TaskRepo, task.TaskCallbackSrvRepo, task.TaskLogRepo, error) {
 	var (
 		taskRepo            task.TaskRepo
 		taskCallbackSrvRepo task.TaskCallbackSrvRepo
 		taskLogRepo         task.TaskLogRepo
 		err                 error
 	)
-	if taskLogRepo, err = mysqlrepo.NewTaskLogRepo(ctx, conf.MysqlConf.ConnDsn); err != nil {
+	if taskLogRepo, err = mysql.NewTaskLogRepo(ctx, cfg.MysqlConf.ConnDsn); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, nil, nil, err
 	}
-	if taskCallbackSrvRepo, err = mysqlrepo.NewTaskSrvRepo(ctx, conf.MysqlConf.ConnDsn); err != nil {
+	if taskCallbackSrvRepo, err = mysql.NewTaskSrvRepo(ctx, cfg.MysqlConf.ConnDsn); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, nil, nil, err
 	}
-	if taskRepo, err = mysqlrepo.NewTaskRepo(ctx, conf.MysqlConf.ConnDsn, taskCallbackSrvRepo, taskLogRepo); err != nil {
+	if taskRepo, err = mysql.NewTaskRepo(ctx, cfg.MysqlConf.ConnDsn, taskCallbackSrvRepo, taskLogRepo); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return nil, nil, nil, err
 	}
 	return taskRepo, taskCallbackSrvRepo, taskLogRepo, nil
 }
 
-func runTaskWorker(ctx context.Context, conf *Conf, taskLogRepo task.TaskLogRepo, taskRepo task.TaskRepo, elect autoelect.AutoElection) *task.WorkerEngine {
+func runTaskWorker(ctx context.Context, cfg *conf.AppConf, taskLogRepo task.TaskLogRepo, taskRepo task.TaskRepo, elect autoelect.AutoElection) *task.WorkerEngine {
 	engine := task.NewWorkerEngine(
-		conf.TaskWorkerPoolSize,
+		cfg.TaskWorkerPoolSize,
 		task.NewSched(taskRepo, elect),
 		callback.NewHttpExec(task.NewTaskLogger(taskLogRepo, logger.MustGetCallbackLogger())),
 		)
@@ -240,8 +201,8 @@ func runTaskWorker(ctx context.Context, conf *Conf, taskLogRepo task.TaskLogRepo
 	return engine
 }
 
-func runHttpApiServer(ctx context.Context, conf *Conf, taskRepo task.TaskRepo, reg *registry.Registry, stopSignCh, stoppedSignCh chan struct{}) error {
-	router := apiserver.NewHttpRouter(conf.HttpApiSrvConf.Host, conf.HttpApiSrvConf.Port, conf.PprofPort)
+func runHttpApiServer(ctx context.Context, cfg *conf.AppConf, taskRepo task.TaskRepo, reg *registry.Registry, stopSignCh, stoppedSignCh chan struct{}) error {
+	router := apiserver.NewHttpRouter(cfg.ApiSrvConf.Host, cfg.ApiSrvConf.Port, cfg.PprofPort)
 	if err := router.RegisterBatch(ctx, getHttpApiRoutes(taskRepo, reg)); err != nil {
 		logger.MustGetSysLogger().Error(ctx, err)
 		return err

@@ -12,6 +12,7 @@ type TaskRepo interface {
 	AddTask(context.Context, *Task) (string, error)
 	GetTaskById(context.Context, string) (*Task, error)
 	DelTaskById(context.Context, string) error
+	DelTasks(context.Context, *optionstream.Stream) error
 }
 
 type TaskCallbackSrvRepo interface {
@@ -26,4 +27,5 @@ type TaskLogRepo interface {
 	SaveTaskStartedLog(context.Context, *TaskStartedLogDetail) error
 	SaveTaskCallbackLog(context.Context, *TaskCallbackLogDetail) error
 	SaveTaskConfirmedLog(context.Context, *TaskConfirmedLogDetail) error
+	DelLogs(context.Context, *optionstream.Stream) error
 }

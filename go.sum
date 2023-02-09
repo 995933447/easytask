@@ -12,6 +12,8 @@ github.com/995933447/dbdriverutil v0.0.0-20221221100824-f994880a6ff1 h1:dvt6u3U+
 github.com/995933447/dbdriverutil v0.0.0-20221221100824-f994880a6ff1/go.mod h1:qJiyqrKB4JOwDKEo3MwlMfVvvbz/+8dXExp4crgR1tY=
 github.com/995933447/distribmu v0.0.0-20221129161736-69f07b237cf4 h1:g0v2TdzlhH328N9hNeWtAkU/+ZHs5hXBVbrRgaTA5pM=
 github.com/995933447/distribmu v0.0.0-20221129161736-69f07b237cf4/go.mod h1:SEuDZTJ5AbPxepNV6Snfy2jvwOXZKT6Zlf0+t0HhEDQ=
+github.com/995933447/goconsole v0.0.0-20230209083111-0fccb97a62d1 h1:5ioS07sepDUliBiX/1CHSXAabFS1Yp2PfPidMIGcwCc=
+github.com/995933447/goconsole v0.0.0-20230209083111-0fccb97a62d1/go.mod h1:eOQfCSv/zLNz8iC0X4dDn3ULaDB1T/ZfmjkS2YRchyA=
 github.com/995933447/log-go v0.0.0-20221129153733-559d735e5c54 h1:ZTvD7D9LsxFGdzcSz3uMvFh8XyCTHJH8w4PTykp7hyw=
 github.com/995933447/log-go v0.0.0-20221129153733-559d735e5c54/go.mod h1:QOlOZqjgS3Vqt/cc+NKcryIMJwWwgYg8qs1BTMAZJTQ=
 github.com/995933447/log-go v0.0.0-20221218090749-3357926f7bc6 h1:DnItD6mEri069vvi7zJNtUn7UI/yGZm5jAdEv80weUE=

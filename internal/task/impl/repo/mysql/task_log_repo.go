@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/optionstream"
 	"sync/atomic"
 	"time"
 )
@@ -14,7 +15,7 @@ type TaskLogRepo struct {
 	repoConnector
 }
 
-func (p *TaskLogRepo) SaveTaskStartedLog(ctx context.Context, detail *task.TaskStartedLogDetail) error {
+func (r *TaskLogRepo) SaveTaskStartedLog(ctx context.Context, detail *task.TaskStartedLogDetail) error {
 	taskModelId, err := toTaskModelId(detail.GetTask().GetId())
 	if err != nil {
 		logger.MustGetRepoLogger().Error(ctx, err)
@@ -25,7 +26,7 @@ func (p *TaskLogRepo) SaveTaskStartedLog(ctx context.Context, detail *task.TaskS
 		logger.MustGetRepoLogger().Error(ctx, err)
 		return err
 	}
-	err = p.mustGetConn(ctx).Create(&TaskLogModel{
+	err = r.mustGetConn(ctx).Create(&TaskLogModel{
 		TaskId: taskModelId,
 		StartedAt: time.Now().Unix(),
 		TaskStatus: statusRunning,
@@ -39,7 +40,7 @@ func (p *TaskLogRepo) SaveTaskStartedLog(ctx context.Context, detail *task.TaskS
 	return nil
 }
 
-func (p *TaskLogRepo) SaveTaskCallbackLog(ctx context.Context, detail *task.TaskCallbackLogDetail) error {
+func (r *TaskLogRepo) SaveTaskCallbackLog(ctx context.Context, detail *task.TaskCallbackLogDetail) error {
 	updateMap := map[string]interface{}{
 		DbFieldIsRunInAsync: detail.IsRunInAsync(),
 		DbFieldReqSnapshot: &TaskLogCallbackReqSnapshot{
@@ -64,7 +65,7 @@ func (p *TaskLogRepo) SaveTaskCallbackLog(ctx context.Context, detail *task.Task
 	if detail.GetErr() != nil {
 		updateMap[DbFieldCallbackErr] = detail.GetErr()
 	}
-	err := p.mustGetConn(ctx).
+	err := r.mustGetConn(ctx).
 		Model(&TaskLogModel{}).
 		Where(DbFieldTaskId, detail.GetTaskId()).
 		Where(DbFieldRunTimes, detail.GetRunTimes()).
@@ -76,7 +77,7 @@ func (p *TaskLogRepo) SaveTaskCallbackLog(ctx context.Context, detail *task.Task
 	return nil
 }
 
-func (p *TaskLogRepo) SaveTaskConfirmedLog(ctx context.Context, detail *task.TaskConfirmedLogDetail) error {
+func (r *TaskLogRepo) SaveTaskConfirmedLog(ctx context.Context, detail *task.TaskConfirmedLogDetail) error {
 	updateMap := map[string]interface{}{
 		DbFieldEndedAt: time.Now().Unix(),
 		DbFieldRespExtra: detail.GetTaskResp().GetExtra(),
@@ -88,13 +89,34 @@ func (p *TaskLogRepo) SaveTaskConfirmedLog(ctx context.Context, detail *task.Tas
 		updateMap[DbFieldTaskStatus] = statusFailed
 	}
 
-	err := p.mustGetConn(ctx).
+	err := r.mustGetConn(ctx).
 		Model(&TaskLogModel{}).
 		Where(DbFieldTaskId, detail.GetTaskResp().GetTaskId()).
 		Where(DbFieldRunTimes, detail.GetTaskResp().GetTaskRunTimes()).
 		Updates(updateMap).
 		Error
 	if err != nil {
+		logger.MustGetRepoLogger().Error(ctx, err)
+		return err
+	}
+
+	return nil
+}
+
+func (r *TaskLogRepo) DelLogs(ctx context.Context, stream *optionstream.Stream) error {
+	conn :=  r.mustGetConn(ctx)
+	err := optionstream.NewStreamProcessor(stream).
+		OnInt64(task.QueryOptKeyCreatedExceed, func(val int64) error {
+			conn = conn.Where(DbFieldCreatedAt + " > ?", val)
+			return nil
+		}).
+		Process()
+	if err != nil {
+		logger.MustGetRepoLogger().Error(ctx, err)
+		return err
+	}
+
+	if err = conn.Unscoped().Delete(&TaskModel{}).Error; err != nil {
 		logger.MustGetRepoLogger().Error(ctx, err)
 		return err
 	}

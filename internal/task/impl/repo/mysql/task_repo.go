@@ -5,6 +5,7 @@ import (
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
 	"github.com/995933447/easytask/pkg/errs"
+	"github.com/995933447/optionstream"
 	"github.com/995933447/reflectutil"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -359,6 +360,31 @@ func (r *TaskRepo) ConfirmTask(ctx context.Context, resp *task.TaskResp) error {
 
 	err = r.logRepo.SaveTaskConfirmedLog(ctx, task.NewTaskConfirmedLogDetail(resp))
 	if err != nil {
+		logger.MustGetRepoLogger().Error(ctx, err)
+		return err
+	}
+
+	return nil
+}
+
+func (r *TaskRepo) DelTasks(ctx context.Context, stream *optionstream.Stream) error {
+	conn :=  r.mustGetConn(ctx)
+	err := optionstream.NewStreamProcessor(stream).
+		OnInt64(task.QueryOptKeyCreatedExceed, func(val int64) error {
+			conn = conn.Where(DbFieldCreatedAt + " > ?", val)
+			return nil
+		}).
+		OnNone(task.QueryOptKeyTaskFinished, func() error {
+			conn = conn.Where(DbFieldAllowMaxRunTimes + " <= " + DbFieldRunTimes)
+			return nil
+		}).
+		Process()
+	if err != nil {
+		logger.MustGetRepoLogger().Error(ctx, err)
+		return err
+	}
+
+	if err = conn.Unscoped().Delete(&TaskLogRepo{}).Error; err != nil {
 		logger.MustGetRepoLogger().Error(ctx, err)
 		return err
 	}

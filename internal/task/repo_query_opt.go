@@ -9,4 +9,8 @@ const (
 	QueryOptKeyInIds
 	// val type: string
 	QueryOptKeyEqName
+	// val type: int64
+	QueryOptKeyCreatedExceed
+	// val type: nil
+	QueryOptKeyTaskFinished
 )

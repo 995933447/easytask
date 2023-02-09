@@ -27,9 +27,9 @@ git clone https://github.com/995933447/easytask.git
 go build -o easytask .
 mv easytask /bin/bash/easytask
 
-// 运行服务, 配置文件示例在项目代码根目录conf/conf.json
+// 运行服务, 配置文件示例在项目代码根目录resource/conf.json
 // 项目依赖: mysql+redis或mysql+etcd(二选一即可),reids或etcd配置其一即可,用于HA主备选举。任务相关数据存储在mysql中。
-easytask -c easytask/conf/conf.json
+easytask -c easytask/resuorce/conf.json
 
 // CTRL+C 会优雅退出.easytak捕获了SIGINT和SIGTERM信号,收到信号均会优雅退出.
 
