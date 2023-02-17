@@ -229,6 +229,7 @@ func (r *TaskSrvRepo) GetSrvsByIds(ctx context.Context, ids []string) ([]*task.T
 func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.QueryStream) ([]*task.TaskCallbackSrv, error) {
 	conn :=  r.mustGetConn(ctx)
 	srvQueryScope := conn
+	var onlyQueryEnabledHealthCheak bool
 	err := optionstream.NewQueryStreamProcessor(queryStream).
 		OnStringList(task.QueryOptKeyInIds, func(val []string) error {
 			var srvModelIds []uint64
@@ -244,6 +245,7 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 			return nil
 		}).
 		OnNone(task.QueryOptKeyEnabledHeathCheck, func() error {
+			onlyQueryEnabledHealthCheak = true
 			srvQueryScope = srvQueryScope.Where(DbFieldHasEnableHealthCheck + " = 1")
 			return nil
 		}).
@@ -275,7 +277,11 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 	srvModelIds := reflectutil.PluckUint64(srvModels, FieldId)
 
 	var routeModels []*TaskCallbackSrvRouteModel
-	err = conn.Where(DbFieldSrvId + " IN ?", srvModelIds).Find(&routeModels).Error
+	srvRouteQueryScope := conn.Where(DbFieldSrvId + " IN ?", srvModelIds)
+	if onlyQueryEnabledHealthCheak {
+		srvRouteQueryScope = srvRouteQueryScope.Where(DbFieldEnableHealthCheck + " = 1")
+	}
+	err = srvRouteQueryScope.Find(&routeModels).Error
 	if err != nil {
 		logger.MustGetRepoLogger().Error(ctx, err)
 		return nil, err
@@ -291,9 +297,6 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 		routeModels := srvIdToRoutesMap[srvModel.Id]
 		var routes []*task.TaskCallbackSrvRoute
 		for _, routeModel := range routeModels {
-			if !routeModel.EnableHealthCheck {
-				continue
-			}
 			routes = append(routes, routeModel.toEntity())
 		}
 		srvs = append(srvs, srvModel.toEntity(routes))
