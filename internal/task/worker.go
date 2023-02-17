@@ -41,8 +41,8 @@ func (e *WorkerEngine) Run(ctx context.Context) {
 }
 
 func (e *WorkerEngine) Stop() {
-	e.isPaused.Store(true)
 	e.sched.stop()
+	e.isPaused.Store(true)
 	e.exitWorkerWait.Wait()
 }
 
