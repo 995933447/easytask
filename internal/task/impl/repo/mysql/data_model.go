@@ -47,7 +47,7 @@ type TaskModel struct {
 	AllowMaxRunTimes int `gorm:"comment:'最大可执行次数'"`
 	MaxRunTimeSec int `gorm:"comment:'任务最长运行时间'"`
 	CallbackPath string `gorm:"comment:'回调路径'"`
-	BizId string `gorm:"index:task_biz,unique,comment:'用于指定任务唯一业务id'"`
+	BizId string `gorm:"index:task_biz,unique;comment:'用于指定任务唯一业务id'"`
 }
 
 func (*TaskModel) TableName() string {
