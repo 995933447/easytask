@@ -144,7 +144,7 @@ func TestApiServer(t *testing.T) {
 		t.Logf("task id：%s", addTaskResp.TaskId)
 	})
 
-	srvMux.HandleFunc("", func(writer http.ResponseWriter, request *http.Request) {
+	srvMux.HandleFunc("/once", func(writer http.ResponseWriter, request *http.Request) {
 		addTaskResp, err := taskCli.AddTask(context.TODO(), &httpproto.AddTaskReq{
 			Name: "test_task_once",
 			SrvName: "srv_test",
