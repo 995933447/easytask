@@ -8,7 +8,7 @@ replace (
 )
 
 require (
-	github.com/995933447/autoelect v0.0.0-20230217072840-7b0c10e28212
+	github.com/995933447/autoelect v0.0.0-20230217074151-ad94dadcba61
 	github.com/995933447/confloader v0.0.0-20221201090521-fc5ce6a68064
 	github.com/995933447/distribmu v0.0.0-20230217073858-f96dbaf8f101
 	github.com/995933447/goconsole v0.0.0-20230209083111-0fccb97a62d1
