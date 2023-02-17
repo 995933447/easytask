@@ -291,6 +291,9 @@ func (r *TaskSrvRepo) GetSrvs(ctx context.Context, queryStream *optionstream.Que
 		routeModels := srvIdToRoutesMap[srvModel.Id]
 		var routes []*task.TaskCallbackSrvRoute
 		for _, routeModel := range routeModels {
+			if !routeModel.EnableHealthCheck {
+				continue
+			}
 			routes = append(routes, routeModel.toEntity())
 		}
 		srvs = append(srvs, srvModel.toEntity(routes))
