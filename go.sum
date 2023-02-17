@@ -16,6 +16,8 @@ github.com/995933447/reflectutil v0.0.0-20220816152525-eaa34e263589 h1:OCJ+gSk/+
 github.com/995933447/reflectutil v0.0.0-20220816152525-eaa34e263589/go.mod h1:Tkho/yq1vuQTuZSuacoXxDkMvU1qtjjbAsB6VEamfa0=
 github.com/995933447/simpletrace v0.0.0-20221215132514-4140c70e8f71 h1:FvWGd2eyJY/cbwF+MxzMgQNtlbXX9jg6y1A7PEK0ZIY=
 github.com/995933447/simpletrace v0.0.0-20221215132514-4140c70e8f71/go.mod h1:3EZ4DZlNwShFb/WN6py+7oARLavgvAq/JhMANPn2bmk=
+github.com/995933447/simpletrace v0.0.0-20230217061256-c25a914bd376 h1:hIHav2TTYiAGn87d9CGiuuty5cT/YBOb5Uxs52FoDgs=
+github.com/995933447/simpletrace v0.0.0-20230217061256-c25a914bd376/go.mod h1:Kh2+nE3eCIOSIwSo8Sxj/MbWt1KPMJJz+9SHptuYr6s=
 github.com/995933447/std-go v0.0.0-20220806175833-ab3496c0b696 h1:GzBuvejakMWMZ6QWpbpcFmJb9WYrZ++yOrm/IEap+hw=
 github.com/995933447/std-go v0.0.0-20220806175833-ab3496c0b696/go.mod h1:Y48pg+Gwti1Ck6BZSCm/+UHmtzC4A1pARw6UdFMpNaI=
 github.com/995933447/stringhelper-go v0.0.0-20220731145713-daa961470957 h1:mTeUsZxg6oHkI8Fs+z2Fco3+gq7gFQWLjHBbTV3pP48=
