@@ -19,7 +19,8 @@
 
   "log": {
       "log_dir": "/var/log/easytask/",
-      "level": "debug"
+      "level": "debug",
+      "file_size": 1073741824
   },
 
   "api_server": {
