@@ -5,19 +5,21 @@ import (
 	"github.com/995933447/easytask/internal/apihandler/service"
 	"github.com/995933447/easytask/internal/task"
 	"github.com/995933447/easytask/internal/util/logger"
+	"github.com/995933447/easytask/pkg/errs"
 	"github.com/995933447/easytask/pkg/rpc/proto"
 	"github.com/995933447/easytask/pkg/rpc/proto/httpproto"
 	"github.com/995933447/reflectutil"
+	"strings"
 )
 
 type HttpApi struct {
-	taskSrv *service.TaskService
+	taskSrv     *service.TaskService
 	registrySrv *service.RegistryService
 }
 
 func NewHttpApi(taskSrv *service.TaskService, registrySrv *service.RegistryService) *HttpApi {
 	return &HttpApi{
-		taskSrv: taskSrv,
+		taskSrv:     taskSrv,
 		registrySrv: registrySrv,
 	}
 }
@@ -27,22 +29,31 @@ func (a *HttpApi) AddTask(ctx context.Context, req *httpproto.AddTaskReq) (*http
 	switch req.SchedMode {
 	case proto.SchedModeTimeCron:
 		schedMode = task.SchedModeTimeCron
+		if strings.TrimSpace(req.TimeCron) == "" {
+			return nil, errs.NewBizErrWithMsg(errs.ErrCodeArgsInvalid, "time cron is empty")
+		}
 	case proto.SchedModeTimeSpec:
 		schedMode = task.SchedModeTimeSpec
+		if req.TimeSpecAt == 0 {
+			return nil, errs.NewBizErrWithMsg(errs.ErrCodeArgsInvalid, "not specific time")
+		}
 	case proto.SchedModeTimeInterval:
 		schedMode = task.SchedModeTimeInterval
+		if req.TimeIntervalSec == 0 {
+			return nil, errs.NewBizErrWithMsg(errs.ErrCodeArgsInvalid, "specific time interval is empty")
+		}
 	}
 
 	addTaskResp, err := a.taskSrv.AddTask(ctx, &service.AddTaskReq{
-		Name: req.Name,
-		SrvName: req.SrvName,
-		CallbackPath: req.CallbackPath,
-		SchedMode: schedMode,
-		TimeSpecAt: req.TimeSpecAt,
+		Name:            req.Name,
+		SrvName:         req.SrvName,
+		CallbackPath:    req.CallbackPath,
+		SchedMode:       schedMode,
+		TimeSpecAt:      req.TimeSpecAt,
 		TimeIntervalSec: req.TimeIntervalSec,
-		TimeCron: req.TimeCron,
-		Arg: req.Arg,
-		BizId: req.BizId,
+		TimeCron:        req.TimeCron,
+		Arg:             req.Arg,
+		BizId:           req.BizId,
 	})
 	if err != nil {
 		logger.MustGetSessLogger().Error(ctx, err)
